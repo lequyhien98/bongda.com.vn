@@ -175,7 +175,9 @@ def handle_crawling(_url, _league_name):
 
 
 if __name__ == '__main__':
+    print('x')
     recreate_tables()
+    print('x')
     slug_list = get_slug_list()
     for slug_item in slug_list:
         league_name = dicSlug[slug_item]
