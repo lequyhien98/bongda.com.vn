@@ -7,6 +7,7 @@ import wget
 from bs4 import BeautifulSoup
 from content_processor import bytes_to_str, clean_up_html
 from sqlalchemy_postgresql.views import create_league, recreate_tables, create_article, create_tables
+from requests.exceptions import ConnectionError
 
 dicSlug = {
     'bong-da-anh': 'Bóng Đá Anh',
@@ -18,6 +19,11 @@ dicSlug = {
     'europa-league': 'Europa League',
     'tin-chuyen-nhuong': 'Tin Chuyển Nhượng',
     'viet-nam': 'Bóng Đá Việt Nam',
+    'bong-da-chau-a': 'Bóng Đá Châu Á',
+    'bong-da-chau-au': ' Bóng Đá Châu Âu',
+    'bong-da-chau-my': 'Bóng Đá Châu Mỹ',
+    'bong-da-chau-phi': 'Bóng Đá Châu Phi',
+    'giao-huu': 'Giao Hữu'
 }
 
 
@@ -35,7 +41,9 @@ def get_soup(_url):
 
 
 def get_slug_list():
-    return ['bong-da-anh', 'bong-da-tbn', 'bong-da-y', 'bong-da-duc', 'bong-da-phap', 'champions-league', 'europa-league', 'tin-chuyen-nhuong']
+    return ['bong-da-anh', 'bong-da-tbn', 'bong-da-y', 'bong-da-duc', 'bong-da-phap', 'champions-league',
+            'europa-league', 'tin-chuyen-nhuong', 'bong-da-chau-a', 'bong-da-chau-au', 'bong-da-chau-my',
+            'bong-da-chau-phi', 'giao-huu']
 
 
 def get_page_url(page, _slug_item):
@@ -86,11 +94,10 @@ def get_image(_title, _desc_tag, _league_name):
             if not os.path.exists(final_directory):
                 continue
             new_path = final_directory + '/%d.jpg' % index
-            if os.path.exists(new_path):
-                continue
-            file_name = wget.download(image_url, out=final_directory)
-            os.rename(file_name, new_path)
-            image_tag['alt'] = 'Hình %d' % index
+            if not os.path.exists(new_path):
+                file_name = wget.download(image_url, out=final_directory)
+                os.rename(file_name, new_path)
+                image_tag['alt'] = 'Hình %d' % index
             image_paths.append(new_path)
     return image_paths
 
@@ -162,19 +169,25 @@ def handle_crawling(_url, _league_name):
             create_article(title, _url, image_paths, desc, published, _league_name)
     except urllib.error.URLError:
         return
+    except ConnectionError:
+        print('No response')
+        return
 
 
 if __name__ == '__main__':
     recreate_tables()
-
     slug_list = get_slug_list()
     for slug_item in slug_list:
         league_name = dicSlug[slug_item]
         create_league(league_name)
-        for i in range(1, 11):
+        for i in range(1, 2):
             url = get_page_url(i, slug_item)
             print(url)
-            soup = get_soup(url)
+            try:
+                soup = get_soup(url)
+            except ConnectionError:
+                print('No response!')
+                continue
             '''Tin mới nhất'''
             url_tag = soup.find('div', {'class': 'col630 fr'})
             if url_tag:
