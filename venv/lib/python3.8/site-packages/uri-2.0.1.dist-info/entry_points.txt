@@ -1,0 +1,13 @@
+[uri.scheme]
+file = uri.scheme:URLScheme
+ftp = uri.scheme:URLScheme
+http = uri.scheme:URLScheme
+https = uri.scheme:URLScheme
+irc = uri.scheme:URLScheme
+ldap = uri.scheme:URLScheme
+mongodb = uri.scheme:URLScheme
+mysql = uri.scheme:URLScheme
+redis = uri.scheme:URLScheme
+sftp = uri.scheme:URLScheme
+telnet = uri.scheme:URLScheme
+
