@@ -50,7 +50,7 @@ def get_page_url(page, _slug_item):
     return 'http://www.bongda.com.vn/%s/p%s' % (_slug_item, page)
 
 
-def create_directory(_title, _league_name):
+def create_directory(_title, _league_name, is_thumbnail_image_path=False):
     current_directory = os.getcwd()
     image_file = os.path.join(current_directory, 'Hình Ảnh')
     if not os.path.exists(image_file):
@@ -61,6 +61,10 @@ def create_directory(_title, _league_name):
     final_directory = os.path.join(category_file, _title)
     if not os.path.exists(final_directory):
         os.makedirs(final_directory)
+    if is_thumbnail_image_path:
+        final_directory = os.path.join(final_directory, 'Thumbnail Image')
+        if not os.path.exists(final_directory):
+            os.makedirs(final_directory)
     return final_directory
 
 
@@ -90,16 +94,32 @@ def get_image(_title, _desc_tag, _league_name):
     final_directory = create_directory(_title, _league_name)
     if image_tags:
         for index, image_tag in enumerate(image_tags, 1):
-            image_url = image_tag['src']
+            image_path = image_tag['src']
             if not os.path.exists(final_directory):
                 continue
             new_path = final_directory + '/%d.jpg' % index
             if not os.path.exists(new_path):
-                file_name = wget.download(image_url, out=final_directory)
+                file_name = wget.download(image_path, out=final_directory)
                 os.rename(file_name, new_path)
                 image_tag['alt'] = 'Hình %d' % index
             image_paths.append(new_path)
     return image_paths
+
+
+def get_thumbnail_image_path(_soup, _title, _league_name):
+    image_path = None
+    thumbnail_image_tag = _soup.find('meta', {'property': 'og:image'})
+    final_directory = create_directory(_title, _league_name, True)
+    if thumbnail_image_tag:
+        thumbnail_image_path = thumbnail_image_tag['content']
+        if not os.path.exists(final_directory):
+            return
+        new_path = final_directory + '/thumbnail_image.jpg'
+        if not os.path.exists(new_path):
+            file_name = wget.download(thumbnail_image_path, out=final_directory)
+            os.rename(file_name, new_path)
+        image_path = new_path
+    return image_path
 
 
 def get_desc(_soup, _title_tag, _desc_tag):
@@ -161,12 +181,13 @@ def handle_crawling(_url, _league_name):
         title_tag = get_title(_soup)
         if title_tag:
             desc_tag = _soup.find('div', {'class': 'exp_content news_details'})
-
             title = title_tag.text.translate(str.maketrans({"'": "''"})).strip()
+            thumbnail_image_path = get_thumbnail_image_path(_soup, title, _league_name)
             published = get_published_time(desc_tag)
             image_paths = get_image(title, desc_tag, _league_name)
             desc = get_desc(_soup, title_tag, desc_tag)
-            create_article(title, _url, image_paths, desc, published, _league_name)
+            create_article(title, _url, image_paths, thumbnail_image_path, desc, published, _league_name)
+
     except urllib.error.URLError:
         return
     except ConnectionError:
@@ -175,9 +196,7 @@ def handle_crawling(_url, _league_name):
 
 
 if __name__ == '__main__':
-    print('x')
     recreate_tables()
-    print('x')
     slug_list = get_slug_list()
     for slug_item in slug_list:
         league_name = dicSlug[slug_item]

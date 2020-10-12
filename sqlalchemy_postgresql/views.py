@@ -19,18 +19,18 @@ def create_tables():
     Base.metadata.create_all(engine)
 
 
-def create_league(catgory_title):
-    catgory = session.query(Category).filter(Category.title == catgory_title).first()
-    if catgory:
+def create_league(category_title):
+    category = session.query(Category).filter(Category.title == category_title).first()
+    if category:
         return
     # Create
-    catgory = Category(title=catgory_title)
-    session.add(catgory)
+    category = Category(title=category_title)
+    session.add(category)
     session.commit()
     session.close_all()
 
 
-def create_article(title, url, image_paths, desc, published, category_name):
+def create_article(title, url, image_paths, thumbnail_image_path, desc, published, category_name):
     article = session.query(Article).filter(Article.url == url).first()
     if article:
         return
@@ -39,6 +39,7 @@ def create_article(title, url, image_paths, desc, published, category_name):
         title=title,
         url=url,
         image_paths=image_paths,
+        thumbnail_image_path=thumbnail_image_path,
         description=desc,
         published=published,
         category_id=category_id

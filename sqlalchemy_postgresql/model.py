@@ -22,10 +22,11 @@ class Article(Base):
     title = Column(String, nullable=False)
     url = Column(String, unique=True)
     image_paths = Column(ARRAY(String))
+    thumbnail_image_path = Column(String)
     description = Column(String)
     published = Column(DateTime, nullable=False)
     removed = Column(Boolean, default=False)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete='SET NULL'))
 
     def __repr__(self):
         return "<Article(title='{}', url='{}' published={})>" \
