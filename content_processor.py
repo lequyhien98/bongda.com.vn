@@ -1,7 +1,6 @@
 import re
 from urllib.parse import urlsplit
-import lxml
-from lxml.html.clean import Cleaner, autolink_html
+from lxml.html.clean import Cleaner
 
 
 class NewCleaner(Cleaner):
@@ -18,21 +17,23 @@ class NewCleaner(Cleaner):
 
 
 cleaner = NewCleaner(
-    page_structure=False,
-    links=False,
-    style=False,
+    page_structure=True,
+    meta=True,
+    embedded=True,
+    links=True,
+    style=True,
+    processing_instructions=True,
+    inline_style=True,
+    scripts=True,
+    javascript=True,
+    comments=True,
+    frames=True,
+    forms=True,
+    annoying_tags=True,
     safe_attrs_only=True,
-    embedded=False,
     remove_tags=('html', 'head', 'body', 'a', 'script'),
-    allow_tags=['strong', 'i', 'b', 'em', 'p', 'div', 'br', 'li', 'img', 'h1'],
-    remove_unknown_tags=False
+    allow_tags=['strong', 'i', 'b', 'em', 'p', 'div', 'li', 'img', 'h1'],
 )
-
-_link_regexes = [re.compile(
-    r'(?P<body>https?://(?P<host>[a-z0-9._-]+)(?:/[/\-_.,'
-    r'a-z0-9ốẽỷăãđýỵẻưỡầéừơẩủớỉặậờàệỗễồụểẫũạằẵỳấíỹửìôứởẹộùêếịèẳáắềĩọổâợữảúự%&?;=~:@#+]*)?(?:\([/\-_.,'
-    r'a-z0-9ốẽỷăãđýỵẻưỡầéừơẩủớỉặậờàệỗễồụểẫũạằẵỳấíỹửìôứởẹộùêếịèẳáắềĩọổâợữảúự%&?;=~:@#+]*\))?)',
-    re.I)]
 
 
 def bytes_to_str(bytes_text):
@@ -42,7 +43,7 @@ def bytes_to_str(bytes_text):
         return str(bytes_text)
 
 
-def clean_up_html(html, method='html'):
-    html = autolink_html(html, link_regexes=_link_regexes)
-    html = lxml.html.fromstring(cleaner.clean_html(html))
-    return lxml.html.tostring(html, encoding='utf-8', method=method)
+def clean_up_html(html):
+    html = re.sub('class=".*?"', '', html)
+    final_text = cleaner.clean_html(html)
+    return final_text

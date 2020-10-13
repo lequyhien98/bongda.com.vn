@@ -20,14 +20,15 @@ class Article(Base):
     __tablename__ = 'articles'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
+    excerpt = Column(String)
     url = Column(String, unique=True)
-    image_paths = Column(ARRAY(String))
-    thumbnail_image_path = Column(String)
-    description = Column(String)
-    published = Column(DateTime, nullable=False)
+    images = Column(ARRAY(String))
+    og_image = Column(String)
+    html = Column(String)
+    published_at = Column(DateTime, nullable=False)
     removed = Column(Boolean, default=False)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete='SET NULL'))
 
     def __repr__(self):
         return "<Article(title='{}', url='{}' published={})>" \
-            .format(self.title, self.url, self.published)
+            .format(self.title, self.url, self.published_at)

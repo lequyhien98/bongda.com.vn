@@ -1,12 +1,13 @@
 import datetime
 import os
+import re
 import urllib.error
-
 import cloudscraper
 import wget
 from bs4 import BeautifulSoup
 from content_processor import bytes_to_str, clean_up_html
-from sqlalchemy_postgresql.views import create_league, recreate_tables, create_article, create_tables
+from sqlalchemy_postgresql.views import create_league, recreate_tables, create_article, create_tables, \
+    create_article_in_web
 from requests.exceptions import ConnectionError
 
 dicSlug = {
@@ -69,69 +70,59 @@ def create_directory(_title, _league_name, is_thumbnail_image_path=False):
 
 
 def get_title(_soup):
+    _title = None
     _title_tag = _soup.find('h1', {'class': 'time_detail_news'})
-    if _title_tag is not None:
-        for attribute in ["class", "id", "name", "style"]:
-            del _title_tag[attribute]
-    return _title_tag
+    if _title_tag:
+        _title = _title_tag.text.strip()
+    return _title.translate(str.maketrans({"'": "''"})).strip()
 
 
 def get_excerpt(_soup):
-    excerpt_tag = _soup.find('p', {'class': 'sapo_detail fontbold'})
-    if excerpt_tag:
-        if excerpt_tag.span:
-            excerpt_tag.span.decompose()
-    for attribute in ["class", "id", "name", "style"]:
-        del excerpt_tag[attribute]
-    excerpt_tag = excerpt_tag.prettify()
-    excerpt_tag = bytes_to_str(clean_up_html(excerpt_tag))
-    return excerpt_tag
+    _excerpt = ''
+    _excerpt_tag = _soup.find('p', {'class': 'sapo_detail fontbold'})
+    if _excerpt_tag:
+        if _excerpt_tag.span:
+            _excerpt_tag.span.decompose()
+        _excerpt = _excerpt_tag.text.strip()
+    return _excerpt.translate(str.maketrans({"'": "''"})).strip()
 
 
-def get_image(_title, _desc_tag, _league_name):
-    image_paths = []
+def get_images(_title, _desc_tag, _league_name):
+    images = []
     image_tags = _desc_tag.findAll('img')
     final_directory = create_directory(_title, _league_name)
     if image_tags:
         for index, image_tag in enumerate(image_tags, 1):
-            image_path = image_tag['src']
+            image_src = image_tag['src']
             if not os.path.exists(final_directory):
                 continue
             new_path = final_directory + '/%d.jpg' % index
             if not os.path.exists(new_path):
-                file_name = wget.download(image_path, out=final_directory)
+                file_name = wget.download(image_src, out=final_directory)
                 os.rename(file_name, new_path)
-                image_tag['alt'] = 'Hình %d' % index
-            image_paths.append(new_path)
-    return image_paths
+            image_tag['src'] = new_path
+            images.append(new_path)
+    return images
 
 
-def get_thumbnail_image_path(_soup, _title, _league_name):
-    image_path = None
-    thumbnail_image_tag = _soup.find('meta', {'property': 'og:image'})
+def get_og_image(_soup, _title, _league_name):
+    _og_image = None
+    _og_image_tag = _soup.find('meta', {'property': 'og:image'})
     final_directory = create_directory(_title, _league_name, True)
-    if thumbnail_image_tag:
-        thumbnail_image_path = thumbnail_image_tag['content']
+    if _og_image_tag:
+        _og_image = _og_image_tag['content']
         if not os.path.exists(final_directory):
             return
         new_path = final_directory + '/thumbnail_image.jpg'
         if not os.path.exists(new_path):
-            file_name = wget.download(thumbnail_image_path, out=final_directory)
+            file_name = wget.download(_og_image, out=final_directory)
             os.rename(file_name, new_path)
-        image_path = new_path
-    return image_path
+        _og_image = new_path
+    return _og_image
 
 
-def get_desc(_soup, _title_tag, _desc_tag):
+def get_desc(_desc_tag):
     final_desc = ""
-    for attribute in ["class", "id", "name", "style"]:
-        del _title_tag[attribute]
-    _title_tag = _title_tag.prettify()
-    _title_tag = bytes_to_str(clean_up_html(_title_tag))
-    final_desc += _title_tag
-    _excerpt = get_excerpt(_soup)
-    if _excerpt:
-        final_desc += _excerpt
 
     '''Xóa 'Tiểu Lam | 22:21 06/10/2020' ở cuối trang'''
     date_tag = _desc_tag.find('div', {'class': 'text-right f13'})
@@ -151,43 +142,67 @@ def get_desc(_soup, _title_tag, _desc_tag):
     for i_tag in _desc_tag.findAll('li'):
         i_tag.decompose()
 
-    '''Đổi thẻ figcaption thành div'''
-    for figcaption in _desc_tag.findAll('figcaption'):
-        figcaption.name = 'div'
-
-    for tag in _desc_tag.findAll(True):
-        for attribute in ["class", "id", "name", "style"]:
-            del tag[attribute]
     del _desc_tag['class']
+    for tag in _desc_tag.findAll(True):
+        if tag.a:
+            while tag.a:
+                tag.a.unwrap()
+            tag.smooth()
+        if tag.name == 'figcaption':
+            if tag.text.strip() in final_desc:
+                continue
+            tag.h2.unwrap()
+            figcaption_tag = tag.prettify()
+            figcaption_tag = bytes_to_str(clean_up_html(figcaption_tag))
+            final_desc += figcaption_tag
+        elif tag.name == 'p':
+            if tag.text.strip() in final_desc:
+                continue
+            p_tag = tag.prettify()
+            p_tag = bytes_to_str(clean_up_html(p_tag))
+            final_desc += p_tag
+        elif tag.name == 'img':
+            img_tag = tag.prettify()
+            img_tag = bytes_to_str(clean_up_html(img_tag))
+            final_desc += img_tag
 
-    _desc_tag = _desc_tag.prettify()
-    _desc_tag = bytes_to_str(clean_up_html(_desc_tag))
-    final_desc += _desc_tag
     final_desc = final_desc.translate(str.maketrans({"'": "''"}))
     return final_desc
 
 
-def get_published_time(desc_tag):
-    published_time_tag = desc_tag.findAll(True)[-1]
-    published_time = published_time_tag.text.split('|')[-1].strip()
-    published_time = datetime.datetime.strptime(published_time, "%H:%M %d/%m/%Y")
-    return published_time
+def get_published_at(_soup):
+    published_at = None
+    published_at_tag = _soup.find('div', {'class': 'time_comment'})
+    if published_at_tag:
+        published_at_text = published_at_tag.span.text.strip()
+        time = published_at_text.split(' ')[0]
+        date = published_at_text.split(' ')[-1]
+        published_at_text = '%s %s' % (time, date)
+        published_at = datetime.datetime.strptime(published_at_text, "%H:%M %d/%m/%Y")
+    return published_at
 
 
-def handle_crawling(_url, _league_name):
+def handle_crawling(_url, _category_name):
     print(_url)
     try:
         _soup = get_soup(_url)
-        title_tag = get_title(_soup)
-        if title_tag:
-            desc_tag = _soup.find('div', {'class': 'exp_content news_details'})
-            title = title_tag.text.translate(str.maketrans({"'": "''"})).strip()
-            thumbnail_image_path = get_thumbnail_image_path(_soup, title, _league_name)
-            published = get_published_time(desc_tag)
-            image_paths = get_image(title, desc_tag, _league_name)
-            desc = get_desc(_soup, title_tag, desc_tag)
-            create_article(title, _url, image_paths, thumbnail_image_path, desc, published, _league_name)
+        title = get_title(_soup)
+        if title:
+            excerpt = get_excerpt(_soup)
 
+            desc_tag = _soup.find('div', {'class': 'exp_content news_details'})
+
+            '''thumbnail Image'''
+            og_image = get_og_image(_soup, title, _category_name)
+            published_at = get_published_at(_soup)
+
+            images = get_images(title, desc_tag, _category_name)
+
+            desc = get_desc(desc_tag)
+
+            create_article(title, excerpt, _url, images, og_image, desc, published_at, _category_name)
+            create_article_in_web(title, excerpt, _category_name, desc, og_image)
+            exit()
     except urllib.error.URLError:
         return
     except ConnectionError:
@@ -214,8 +229,9 @@ if __name__ == '__main__':
             if url_tag:
                 url = url_tag.a['href']
                 handle_crawling(url, league_name)
-            '''List url của trang'''
-            url_list = soup.find('ul', {'class': 'list_top_news list_news_cate'})
-            for url_tag in url_list.findAll('li'):
-                url = url_tag.a['href']
-                handle_crawling(url, league_name)
+    #         '''List url của trang'''
+    #         url_list = soup.find('ul', {'class': 'list_top_news list_news_cate'})
+    #         if url_list:
+    #             for url_tag in url_list.findAll('li'):
+    #                 url = url_tag.a['href']
+    #                 handle_crawling(url, league_name)
