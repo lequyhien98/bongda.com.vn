@@ -3,7 +3,7 @@ import jwt  # pip install pyjwt
 from datetime import datetime as date
 
 # Admin API key goes here
-key = '5f855492d70dbb1f4d6670a9:973462cc2b98778481070f47ece548f879d8f23a017a33faddb4b2fff3e81cfa'
+key = '5f869d2cd70dbb1f4d667103:3fcd0fa77dd62466bf7f2059fbc62c554ee3b74980b26369cfae7e57c18f243f'
 
 # Split the key into ID and SECRET
 _id, secret = key.split(':')

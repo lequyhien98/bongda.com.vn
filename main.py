@@ -3,11 +3,13 @@ import os
 import re
 import urllib.error
 import cloudscraper
+import slug
 import wget
 from bs4 import BeautifulSoup
+from slugify import slugify
 from content_processor import bytes_to_str, clean_up_html
 from sqlalchemy_postgresql.views import create_league, recreate_tables, create_article, create_tables, \
-    create_article_in_web
+    create_article_in_web, uploading_image
 from requests.exceptions import ConnectionError
 
 dicSlug = {
@@ -52,6 +54,7 @@ def get_page_url(page, _slug_item):
 
 
 def create_directory(_title, _league_name, is_thumbnail_image_path=False):
+    _title = _title.replace("'", "").strip().replace("\"", "").strip()
     current_directory = os.getcwd()
     image_file = os.path.join(current_directory, 'Hình Ảnh')
     if not os.path.exists(image_file):
@@ -63,7 +66,7 @@ def create_directory(_title, _league_name, is_thumbnail_image_path=False):
     if not os.path.exists(final_directory):
         os.makedirs(final_directory)
     if is_thumbnail_image_path:
-        final_directory = os.path.join(final_directory, 'Thumbnail Image')
+        final_directory = os.path.join(final_directory, 'Thumbnail')
         if not os.path.exists(final_directory):
             os.makedirs(final_directory)
     return final_directory
@@ -74,7 +77,9 @@ def get_title(_soup):
     _title_tag = _soup.find('h1', {'class': 'time_detail_news'})
     if _title_tag:
         _title = _title_tag.text.strip()
-    return _title.translate(str.maketrans({"'": "''"})).strip()
+        _title.translate(str.maketrans({"'": "''"})).strip()
+    print(_title)
+    return _title
 
 
 def get_excerpt(_soup):
@@ -87,18 +92,20 @@ def get_excerpt(_soup):
     return _excerpt.translate(str.maketrans({"'": "''"})).strip()
 
 
-def get_images(_title, _desc_tag, _league_name):
+def get_images(_title, _desc_tag, _category_name):
     images = []
     image_tags = _desc_tag.findAll('img')
-    final_directory = create_directory(_title, _league_name)
+    final_directory = create_directory(_title, _category_name)
+    slug_title = slugify(_title)
+    _slug = '/{0}-{1}'.format(slug_title, 'bong-da-xanh')
     if image_tags:
         for index, image_tag in enumerate(image_tags, 1):
-            image_src = image_tag['src']
+            image_url = image_tag['src']
             if not os.path.exists(final_directory):
                 continue
-            new_path = final_directory + '/%d.jpg' % index
+            new_path = final_directory + '/%s-%d.jpg' % (_slug, index)
             if not os.path.exists(new_path):
-                file_name = wget.download(image_src, out=final_directory)
+                file_name = wget.download(image_url, out=final_directory)
                 os.rename(file_name, new_path)
             image_tag['src'] = new_path
             images.append(new_path)
@@ -106,19 +113,23 @@ def get_images(_title, _desc_tag, _league_name):
 
 
 def get_og_image(_soup, _title, _league_name):
-    _og_image = None
+    og_image_path = None
+    new_og_image_url = None
+    slug_title = slugify(_title)
+    _slug = '/{0}-{1}'.format(slug_title, 'bong-da-xanh-thumbnail')
     _og_image_tag = _soup.find('meta', {'property': 'og:image'})
     final_directory = create_directory(_title, _league_name, True)
     if _og_image_tag:
-        _og_image = _og_image_tag['content']
+        _og_image_url = _og_image_tag['content']
         if not os.path.exists(final_directory):
             return
-        new_path = final_directory + '/thumbnail_image.jpg'
+        new_path = final_directory + '{}.jpg'.format(_slug)
         if not os.path.exists(new_path):
-            file_name = wget.download(_og_image, out=final_directory)
+            file_name = wget.download(_og_image_url, out=final_directory)
             os.rename(file_name, new_path)
-        _og_image = new_path
-    return _og_image
+            new_og_image_url = uploading_image(new_path)
+        og_image_path = new_path
+    return og_image_path, new_og_image_url
 
 
 def get_desc(_desc_tag):
@@ -189,19 +200,19 @@ def handle_crawling(_url, _category_name):
         title = get_title(_soup)
         if title:
             excerpt = get_excerpt(_soup)
-
             desc_tag = _soup.find('div', {'class': 'exp_content news_details'})
 
             '''thumbnail Image'''
-            og_image = get_og_image(_soup, title, _category_name)
-            published_at = get_published_at(_soup)
+            og_image_path, og_image_url = get_og_image(_soup, title, _category_name)
+            image_paths = get_images(title, desc_tag, _category_name)
 
-            images = get_images(title, desc_tag, _category_name)
+            published_at = get_published_at(_soup)
 
             desc = get_desc(desc_tag)
 
-            create_article(title, excerpt, _url, images, og_image, desc, published_at, _category_name)
-            create_article_in_web(title, excerpt, _category_name, desc, og_image)
+            create_article(title, excerpt, _url, image_paths, og_image_path, og_image_url, desc, published_at,
+                           _category_name)
+            # create_article_in_web(title, excerpt, _category_name, desc, og_image)
             exit()
     except urllib.error.URLError:
         return
