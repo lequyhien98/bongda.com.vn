@@ -8,8 +8,8 @@ import wget
 from bs4 import BeautifulSoup
 from slugify import slugify
 from content_processor import bytes_to_str, clean_up_html
-from sqlalchemy_postgresql.views import create_league, recreate_tables, create_article, create_tables, \
-    create_article_in_web, uploading_image
+from sqlalchemy_postgresql.views import recreate_tables, create_article, create_tables, \
+    create_article_in_web, uploading_image, check_article, create_category
 from requests.exceptions import ConnectionError
 
 dicSlug = {
@@ -54,7 +54,7 @@ def get_page_url(page, _slug_item):
 
 
 def create_directory(_title, _league_name, is_thumbnail_image_path=False):
-    _title = _title.replace("'", "").strip().replace("\"", "").strip()
+    _title = _title.replace("\"", "").strip()
     current_directory = os.getcwd()
     image_file = os.path.join(current_directory, 'Hình Ảnh')
     if not os.path.exists(image_file):
@@ -77,8 +77,9 @@ def get_title(_soup):
     _title_tag = _soup.find('h1', {'class': 'time_detail_news'})
     if _title_tag:
         _title = _title_tag.text.strip()
-        _title.translate(str.maketrans({"'": "''"})).strip()
-    print(_title)
+        '''Để lưu vào data base không bị lỗi cứ pháp'''
+        # _title = _title.replace("'", "\'").strip()
+    print('Tên bài báo: %s' % _title)
     return _title
 
 
@@ -89,46 +90,73 @@ def get_excerpt(_soup):
         if _excerpt_tag.span:
             _excerpt_tag.span.decompose()
         _excerpt = _excerpt_tag.text.strip()
-    return _excerpt.translate(str.maketrans({"'": "''"})).strip()
+    return _excerpt
 
 
 def get_images(_title, _desc_tag, _category_name):
     images = []
+    image_urls = []
+
     image_tags = _desc_tag.findAll('img')
+
+    '''Tạo thư mục lưu ảnh'''
     final_directory = create_directory(_title, _category_name)
-    slug_title = slugify(_title)
-    _slug = '/{0}-{1}'.format(slug_title, 'bong-da-xanh')
+
+    '''Tạo slug đặt tên cho img'''
+    _slug = '{}'.format('bong-da-xanh')
     if image_tags:
         for index, image_tag in enumerate(image_tags, 1):
+            '''Lấy src của ảnh'''
             image_url = image_tag['src']
-            if not os.path.exists(final_directory):
-                continue
+
+            '''Path đặt ảnh mà bạn mong muốn'''
             new_path = final_directory + '/%s-%d.jpg' % (_slug, index)
-            if not os.path.exists(new_path):
-                file_name = wget.download(image_url, out=final_directory)
-                os.rename(file_name, new_path)
-            image_tag['src'] = new_path
+
+            '''Tải ảnh về'''
+            file_name = wget.download(image_url, out=final_directory)
+
+            '''Đổi tên lại theo path mà bạn đã đặt'''
+            os.rename(file_name, new_path)
+
+            '''Upload ảnh lên cdn với path mới và lưu lại để bỏ vào database'''
+            image_tag['src'] = uploading_image(new_path)
+            image_urls.append(image_tag['src'])
+
+            '''Lưu lại để bỏ vào batabase'''
             images.append(new_path)
-    return images
+    return images, image_urls
 
 
 def get_og_image(_soup, _title, _league_name):
     og_image_path = None
     new_og_image_url = None
-    slug_title = slugify(_title)
-    _slug = '/{0}-{1}'.format(slug_title, 'bong-da-xanh-thumbnail')
-    _og_image_tag = _soup.find('meta', {'property': 'og:image'})
+
+    '''Tạo thư mục lưu ảnh'''
     final_directory = create_directory(_title, _league_name, True)
+
+    '''Tạo slug đặt tên cho img'''
+    _slug_image = '/{}'.format('bong-da-xanh-thumbnail')
+    # print('Slug tên của image: %s' % _slug_image)
+
+    _og_image_tag = _soup.find('meta', {'property': 'og:image'})
     if _og_image_tag:
+        '''Lấy src của ảnh'''
         _og_image_url = _og_image_tag['content']
-        if not os.path.exists(final_directory):
-            return
-        new_path = final_directory + '{}.jpg'.format(_slug)
-        if not os.path.exists(new_path):
-            file_name = wget.download(_og_image_url, out=final_directory)
-            os.rename(file_name, new_path)
-            new_og_image_url = uploading_image(new_path)
-        og_image_path = new_path
+
+        '''Path đặt ảnh mà bạn mong muốn'''
+        new_og_image_path = final_directory + '{}.jpg'.format(_slug_image)
+
+        '''Tải ảnh về'''
+        file_name = wget.download(_og_image_url, out=final_directory)
+
+        '''Đổi tên lại theo path mà bạn đã đặt'''
+        os.rename(file_name, new_og_image_path)
+
+        '''Upload ảnh lên cdn với path mới và lưu lại để bỏ vào database'''
+        new_og_image_url = uploading_image(new_og_image_path)
+
+        '''Lưu lại để bỏ vào batabase'''
+        og_image_path = new_og_image_path
     return og_image_path, new_og_image_url
 
 
@@ -159,7 +187,7 @@ def get_desc(_desc_tag):
             while tag.a:
                 tag.a.unwrap()
             tag.smooth()
-        if tag.name == 'figcaption':
+        if tag.name == 'figure':
             if tag.text.strip() in final_desc:
                 continue
             tag.h2.unwrap()
@@ -172,12 +200,7 @@ def get_desc(_desc_tag):
             p_tag = tag.prettify()
             p_tag = bytes_to_str(clean_up_html(p_tag))
             final_desc += p_tag
-        elif tag.name == 'img':
-            img_tag = tag.prettify()
-            img_tag = bytes_to_str(clean_up_html(img_tag))
-            final_desc += img_tag
-
-    final_desc = final_desc.translate(str.maketrans({"'": "''"}))
+    final_desc = final_desc
     return final_desc
 
 
@@ -201,19 +224,17 @@ def handle_crawling(_url, _category_name):
         if title:
             excerpt = get_excerpt(_soup)
             desc_tag = _soup.find('div', {'class': 'exp_content news_details'})
-
+            '''Images in Post'''
+            image_paths, image_urls = get_images(title, desc_tag, _category_name)
             '''thumbnail Image'''
             og_image_path, og_image_url = get_og_image(_soup, title, _category_name)
-            image_paths = get_images(title, desc_tag, _category_name)
 
             published_at = get_published_at(_soup)
 
-            desc = get_desc(desc_tag)
-
-            create_article(title, excerpt, _url, image_paths, og_image_path, og_image_url, desc, published_at,
-                           _category_name)
-            # create_article_in_web(title, excerpt, _category_name, desc, og_image)
-            exit()
+            html = get_desc(desc_tag)
+            '''Lưu bài vào database'''
+            create_article(title, _url, published_at, og_image_url, og_image_path, image_urls, image_paths, excerpt, html, _category_name)
+            create_article_in_web(title, og_image_url, excerpt, html, _category_name)
     except urllib.error.URLError:
         return
     except ConnectionError:
@@ -222,14 +243,13 @@ def handle_crawling(_url, _category_name):
 
 
 if __name__ == '__main__':
-    recreate_tables()
+    # recreate_tables()
     slug_list = get_slug_list()
     for slug_item in slug_list:
-        league_name = dicSlug[slug_item]
-        create_league(league_name)
+        category_name = dicSlug[slug_item]
+        create_category(category_name)
         for i in range(1, 2):
             url = get_page_url(i, slug_item)
-            print(url)
             try:
                 soup = get_soup(url)
             except ConnectionError:
@@ -238,8 +258,11 @@ if __name__ == '__main__':
             '''Tin mới nhất'''
             url_tag = soup.find('div', {'class': 'col630 fr'})
             if url_tag:
-                url = url_tag.a['href']
-                handle_crawling(url, league_name)
+                article_url = url_tag.a['href']
+                '''Check xem bài post này đã có trong database chưa bằng việc xét url của nó'''
+                if check_article(article_url):
+                    continue
+                handle_crawling(article_url, category_name)
     #         '''List url của trang'''
     #         url_list = soup.find('ul', {'class': 'list_top_news list_news_cate'})
     #         if url_list:

@@ -1,15 +1,12 @@
-import os
 from pprint import pprint
 
 import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from cdn_token import token_cdn
 from sqlalchemy_postgresql.config import DATABASE_URI
 from sqlalchemy_postgresql.model import Base, Category, Article
 from token_genertion import token
-from PIL import Image
 
 engine = create_engine(DATABASE_URI)
 
@@ -24,7 +21,7 @@ def create_tables():
     Base.metadata.create_all(engine)
 
 
-def create_league(category_title):
+def create_category(category_title):
     category = session.query(Category).filter(Category.title == category_title).first()
     if category:
         return
@@ -32,59 +29,77 @@ def create_league(category_title):
     category = Category(title=category_title)
     session.add(category)
     session.commit()
-    session.close_all()
+    session.close()
 
 
-def create_article(title, excerpt, url, image_paths, og_image_path, og_image_url, desc, published_at, category_name):
-    article = session.query(Article).filter(Article.url == url).first()
+def check_article(url):
+    print(url)
+    article = session.query(Article).filter(Article.url == url, Article.removed == False).first()
     if article:
-        print('Cào rồi!')
-        return
+        print('Bài này đã tồn tại!')
+        return True
+    else:
+        return False
+
+
+def create_article(title, url, published_at, og_image_url, og_image_path, image_urls, image_paths, excerpt, html,
+                   category_name):
     category_id = session.query(Category).filter(Category.title == category_name).first().id
     article = Article(
         title=title,
-        excerpt=excerpt,
         url=url,
-        image_paths=image_paths,
-        og_image_path=og_image_path,
-        og_image_url=og_image_url,
-        html=desc,
         published_at=published_at,
+        og_image_url=og_image_url,
+        og_image_path=og_image_path,
+        image_urls=image_urls,
+        image_paths=image_paths,
+        excerpt=excerpt,
+        html=html,
         category_id=category_id
     )
     session.add(article)
     session.commit()
-    print('OK!')
-    session.close_all()
+    print('Lưu vào database thành công!')
+    session.close()
 
 
 def uploading_image(_og_image_path):
+    _og_image_url = None
     url = "https://cdn1.codeprime.net/api/upload/"
-    headers = {'Authorization': 'JWT {}'.format(token_cdn),
-               'Content-Type': 'application/json'}
-
-    files = {
-        'file': open(_og_image_path, 'rb'),
+    payload = {
         'namespace': 'bdx',
         'keep_original_name': 'yes',
-        'also_verify': 'yes'
     }
-    response = requests.request("POST", url, headers=headers, files=files).json()
-    pprint(response)
+    files = [
+        ('file', open(_og_image_path, 'rb'))
+    ]
+    headers = {
+    }
+    response = requests.request("POST", url, headers=headers, data=payload, files=files)
+    if response.ok:
+        _og_image_url = response.json()['original']['url']
+    return _og_image_url
 
 
-def create_article_in_web(title, excerpt, category_name, desc, og_image):
+def create_article_in_web(title, _og_image_url, excerpt, html, category_name):
     # Make an authenticated request to create a post
     headers = {'Authorization': 'Ghost {}'.format(token.decode())}
     url = 'https://www.bongdaxanh.com/ghost/api/v3/admin/posts/?source=html'
     body = {'posts': [{'title': title,
+                       'og_title': title,
+                       'twitter_title': title,
+                       'feature_image': _og_image_url,
+                       'tags': [category_name],
+                       'og_image': _og_image_url,
+                       'twitter_image': _og_image_url,
+                       'og_description': excerpt,
+                       'twitter_description': excerpt,
                        'custom_excerpt': excerpt,
                        'excerpt': excerpt,
-                       'html': desc,
-                       'tags': [category_name],
+                       'html': html
                        }]}
-    r = requests.post(url, json=body, headers=headers)
-    print(r)
+    response = requests.post(url, json=body, headers=headers)
+    print(response)
 
 
 def recreate_tables():
