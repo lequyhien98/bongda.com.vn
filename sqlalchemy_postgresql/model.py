@@ -1,6 +1,6 @@
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 
 Base = declarative_base()
 
@@ -8,12 +8,10 @@ Base = declarative_base()
 class Category(Base):
     __tablename__ = 'categories'
     id = Column(Integer, primary_key=True)
-    title = Column(String, nullable=False, unique=True)
-    order = Column(Integer, default=1)
+    name = Column(String, nullable=False, unique=True)
 
     def __repr__(self):
-        return "<Category(title='{}', order='{}')>" \
-            .format(self.title, self.order)
+        return "<Category(title='{}')>".format(self.name)
 
 
 class Article(Base):
@@ -21,7 +19,6 @@ class Article(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     url = Column(String, unique=True)
-    removed = Column(Boolean, default=False)
     published_at = Column(DateTime)
     og_image_url = Column(String)
     og_image_path = Column(String)
