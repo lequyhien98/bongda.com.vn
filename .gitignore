@@ -1,5 +1,4 @@
 /Hình Ảnh/
 /sqlalchemy_postgresql/config.py
-/postgresql
-/cdn_token.py
-/token_genertion.py
+/token_genertion/cdn_token_genertion.py
+/token_genertion/ghost_token_genertion.py
