@@ -1,4 +1,3 @@
-import requests  # pip install requests
 import jwt  # pip install pyjwt
 from datetime import datetime as date
 
@@ -19,6 +18,6 @@ payload = {
 }
 
 # Create the token (including decoding secret)
-token = jwt.encode(payload, bytes.fromhex(secret), algorithm='HS256', headers=header)
+ghost_token = jwt.encode(payload, bytes.fromhex(secret), algorithm='HS256', headers=header)
 
 
