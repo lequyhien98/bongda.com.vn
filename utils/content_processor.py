@@ -19,7 +19,7 @@ cleaner = NewCleaner(
     annoying_tags=True,
     safe_attrs_only=True,
     remove_tags=('html', 'head', 'body', 'a', 'script'),
-    allow_tags=['p', 'div', 'li', 'img', 'h1', 'figcaption', 'figure', 'em', 'strong'],
+    allow_tags=['p', 'div', 'li', 'img', 'h1', 'figcaption', 'figure', 'em', 'strong', 'br'],
 )
 
 

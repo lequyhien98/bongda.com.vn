@@ -21,6 +21,7 @@ urlopen==1.0.0
 utils==1.0.1
 webencodings==0.5.1
 wget==3.2
-
+slugify==0.0.1
 pytz~=2020.1
 PyJWT~=1.7.1
+selenium~=3.141.0
