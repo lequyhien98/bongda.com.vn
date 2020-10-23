@@ -1,11 +1,14 @@
+from datetime import tzinfo, timedelta
+
 import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from token_genertion.cdn_token_genertion import cdn_token
 from sqlalchemy_postgresql.config import DATABASE_URI
-from sqlalchemy_postgresql.model import Base, Category, Article, Source
-from token_genertion.ghost_token_genertion import ghost_token
+from sqlalchemy_postgresql.model import Base, Article, Source
+from token_genertion.ghost_token_genertion import create_token
+from slugify import slugify
 
 engine = create_engine(DATABASE_URI)
 
@@ -35,6 +38,13 @@ def create_source():
     session.close()
 
 
+class VN(tzinfo):
+    """A time zone with an arbitrary, constant +7:00 offset."""
+
+    def utcoffset(self, dt):
+        return timedelta(hours=7, minutes=00)
+
+
 def get_source(_source_name):
     _source = session.query(Source).filter(Source.name == _source_name).first()
     if not _source:
@@ -43,36 +53,32 @@ def get_source(_source_name):
     return _source
 
 
-def check_news(url, category_name):
+def get_slug(_title):
+    _slug = slugify(_title)
+    return _slug
+
+
+def check_news(url, tag):
     news = session.query(Article).filter(Article.src_url == url).first()
     if news:
-        if category_name not in news.tags:
-            news.tags = [*news.tags, category_name]
+        slug = get_slug(news.title)
+        is_published, news_id, updated_at, tags = get_post_by_slug(slug)
+        if tag not in news.tags:
+            news.tags = [*news.tags, tag]
             session.add(news)
             session.commit()
-            print(news.tags)
-        print('Bài này đã tồn tại!')
+            if is_published:
+                news.tags.append(tag)
+                updating_a_post(news_id, news.tags, updated_at)
+                print('Đã có trên Bongdaxanh.com!')
+        print('Bài này có trong database!')
         return True
     else:
         return False
 
 
-def create_category(category_name):
-    category = session.query(Category).filter(Category.name == category_name).first()
-    if category:
-        return
-    # Create category
-    category = Category(name=category_name)
-    session.add(category)
-    session.commit()
-    print('Lưu tag vào database thành công!')
-    session.close()
-
-
 def create_article(title, url, bdx_url, tags, published_at, og_image_url, og_image_path, image_urls, image_paths,
-                   excerpt, html, category_name, source):
-    # category_id = session.query(Category).filter(Category.name == category_name).first().id
-    category_id = None
+                   excerpt, html, source):
     article = Article(
         title=title,
         src_url=url,
@@ -85,7 +91,6 @@ def create_article(title, url, bdx_url, tags, published_at, og_image_url, og_ima
         image_paths=image_paths,
         excerpt=excerpt,
         html=html,
-        category_id=category_id,
         source_id=source.id
     )
     session.add(article)
@@ -108,7 +113,7 @@ def uploading_og_image(_og_image_path):
     if response.ok:
         _og_image_url = response.json()['original']['url']
         print('Uploading image is successful')
-        # verify_upload(response.json()['verifyCode'])
+        verify_upload(response.json()['verifyCode'])
     else:
         print('Uploading image is not successful')
     return _og_image_url
@@ -129,7 +134,7 @@ def uploading_image(image_path):
     if response.ok:
         _image_url = response.json()['resizeContain']['740x400']['url']
         print('Uploading image is successful')
-        # verify_upload(response.json()['verifyCode'])
+        verify_upload(response.json()['verifyCode'])
     else:
         print('Uploading image is not successful')
     return _image_url
@@ -152,6 +157,7 @@ def create_article_in_web(title, tags, published_at, og_image_url, excerpt, html
     # Make an authenticated request to create a post
     _id = None
     bdx_url = None
+    ghost_token = create_token()
     headers = {'Authorization': 'Ghost {}'.format(ghost_token.decode())}
     url = 'https://www.bongdaxanh.com/ghost/api/v3/admin/posts/?source=html'
     body = {'posts': [{'title': title,
@@ -186,6 +192,28 @@ def create_article_in_web(title, tags, published_at, og_image_url, excerpt, html
 
 
 def get_post_by_slug(slug):
-    url = 'https://www.bongdaxanh.com/ghost/api/v3/content/posts/slug/%s/?key=6639515e8b14a6b71a3e483479' % slug
+    news_id = None
+    updated_at = None
+    tags = []
+    url = 'https://www.bongdaxanh.com/ghost/api/v3/content/posts/slug/%s/?key=6639515e8b14a6b71a3e483479&include=tags' % slug
     response = requests.get(url)
-    return response.ok
+    if response.ok:
+        news_id = response.json()['posts'][0]['id']
+        updated_at = response.json()['posts'][0]['updated_at']
+        json_tags = response.json()['posts'][0]['tags']
+        for json_tag in json_tags:
+            tags.append(json_tag['name'])
+    return response.ok, news_id, updated_at, tags
+
+
+def updating_a_post(news_id, tags, updated_at):
+    url = 'https://www.bongdaxanh.com/ghost/api/v3/admin/posts/%s/?key=6639515e8b14a6b71a3e483479' % news_id
+    ghost_token = create_token()
+    headers = {'Authorization': 'Ghost {}'.format(ghost_token.decode())}
+    body = {
+        'posts': [{'tags': tags,
+                   'updated_at': updated_at,
+                   }]
+    }
+    response = requests.put(url, json=body, headers=headers)
+    print(response)

@@ -6,16 +6,18 @@ import cloudscraper
 import wget
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from sqlalchemy_postgresql.views import recreate_tables, create_article, create_article_in_web, uploading_image, create_category, create_tables, uploading_og_image, get_post_by_slug, get_source, check_news
+from sqlalchemy_postgresql.views import recreate_tables, create_article, create_article_in_web, uploading_image, \
+    create_tables, uploading_og_image, get_source, check_news, get_slug, get_post_by_slug, updating_a_post
 from requests.exceptions import ConnectionError
-from slugify import slugify
 from utils.content_processor import clean_up_html
 
 
 def get_slug_list(_source):
     if _source.name == 'bongda.com.vn':
-        return ['bong-da-anh', 'ngoai-hang-anh', 'cup-lien-doan-anh', 'cup-fa', 'tin-khac-anh', 'bong-da-tbn', 'bong-da-y', 'bong-da-duc', 'bong-da-phap', 'champions-league',
-                'europa-league', 'tin-chuyen-nhuong', 'hau-truong-san-co']
+        return ['bong-da-anh', 'ngoai-hang-anh', 'cup-lien-doan-anh', 'cup-fa', 'tin-khac-anh', 'bong-da-tbn',
+                'la-liga', 'cup-nha-vua', 'bong-da-y', 'serie-a', 'cup-quoc-gia-y', 'tin-khac-italia', 'bong-da-duc',
+                'bundesliga', 'cup-quoc-gia-duc', 'tin-khac-duc', 'bong-da-phap', 'ligue-1', 'cup-lien-doan-phap',
+                'tin-khac-phap', 'champions-league', 'europa-league', 'tin-chuyen-nhuong', 'hau-truong-san-co']
     elif _source.name == 'bongdaplus.vn':
         return ['ngoai-hang-anh', 'bong-da-tay-ban-nha', 'bong-da-y', 'bong-da-duc', 'bong-da-phap',
                 'champions-league-cup-c1', 'europa-league', 'chuyen-nhuong']
@@ -30,10 +32,22 @@ def get_dict_slug(_source):
             'cup-lien-doan-anh': 'Cúp Liên Đoàn Anh',
             'cup-fa': 'Cúp FA',
             'tin-khac-anh': 'Tin khác Anh',
+            'la-liga': 'La Liga',
+            'cup-nha-vua': 'Cúp Nhà Vua',
+            'tin-khac-tbn': 'Tin Khác Tây Ban Nha',
             'bong-da-tbn': 'Bóng Đá Tây Ban Nha',
             'bong-da-y': 'Bóng Đá Ý',
+            'serie-a': 'Seria',
+            'cup-quoc-gia-y': 'Cúp Quốc Gia Ý',
+            'tin-khac-italia': 'Tin Khác Ý',
             'bong-da-duc': 'Bóng Đá Đức',
+            'bundesliga': 'Bundesliga',
+            'cup-quoc-gia-duc': 'Cúp Quốc Gia Đức',
+            'tin-khac-duc': 'Tin Khác Đức',
             'bong-da-phap': 'Bóng Đá Pháp',
+            'ligue-1': 'Ligue 1',
+            'cup-lien-doan-phap': 'Cúp Liên Đoàn Pháp',
+            'tin-khac-phap': 'Tin Khác Pháp',
             'hau-truong-san-co': 'Hậu Trường',
             'champions-league': 'Champions League',
             'europa-league': 'Europa League',
@@ -96,7 +110,6 @@ def get_tags(news_soup):
         return tags
     for a_tag in a_tags:
         tags.append(a_tag.get_text(strip=True).title())
-    print(tags)
     return tags
 
 
@@ -138,11 +151,6 @@ def get_title(news_soup):
         title = title_tag.get_text(strip=True)
     print('Tên bài báo: %s' % title)
     return title
-
-
-def get_slug(_title):
-    _slug = slugify(_title)
-    return _slug
 
 
 def get_excerpt(news_soup):
@@ -231,7 +239,6 @@ def get_og_image(title, news_soup):
 
         # Lưu lại để bỏ vào batabase
         og_image_path = new_og_image_path
-
     return og_image_path, new_og_image_url
 
 
@@ -291,12 +298,19 @@ def get_desc(news_soup):
             if is_delete:
                 continue
             if tag.name == 'figure':
-                print(tag)
-                figcaption_tag = clean_up_html(str(tag))
-                final_desc += figcaption_tag
+                figure_tag = clean_up_html(str(tag))
+                final_desc += figure_tag
             elif tag.name == 'p':
                 if tag.text.strip() in final_desc:
-                    continue
+                    if not tag.img:
+                        continue
+                    else:
+                        tag.name = 'figure'
+                        alt = tag.img.attrs['alt']
+                        if alt:
+                            new_figcaption_tag = news_soup.new_tag('figcaption')
+                            new_figcaption_tag.string = alt
+                            tag.append(new_figcaption_tag)
                 if tag.strong:
                     if tag.get_text(strip=True) == 'XEM THÊM':
                         is_delete = True
@@ -345,7 +359,6 @@ def get_published_at(news_soup):
 
 
 def crawl_a_news(url_item):
-    print(url_item)
     try:
         try:
             news_soup = get_soup(url_item)
@@ -354,13 +367,18 @@ def crawl_a_news(url_item):
             return
         title = get_title(news_soup)
         if title:
-            # slug = get_slug(title)
-            # if get_post_by_slug(slug):
-            #     print('Đã có trên Bongdaxanh.com!')
-            #     return
+            slug = get_slug(title)
+            is_published, news_id, updated_at, tags = get_post_by_slug(slug)
+            if is_published:
+                print('Đã có trên Bongdaxanh.com!')
+                if category_name not in tags:
+                    tags.append(category_name)
+                    updating_a_post(news_id, tags, updated_at)
+                return
+
             tags = get_tags(news_soup)
             excerpt = get_excerpt(news_soup)
-        #
+
             # Lấy hình trong post lưu đường dẫn vào url
             image_paths, image_urls = get_images(title, news_soup)
 
@@ -370,15 +388,15 @@ def crawl_a_news(url_item):
             # Lấy thời gian publish của bài post trên web
             published_at = get_published_at(news_soup)
 
-        #     # Lấy nội dung của bài post
+            # Lấy nội dung của bài post
             html = get_desc(news_soup)
-        #
-        #     # Đăng lên web
+
+            #     # Đăng lên web
             bdx_url = create_article_in_web(title, tags, published_at, og_image_url, excerpt, html)
-        #
-        #     # Lưu bài vào database
+
+            #     # Lưu bài vào database
             create_article(title, url_item, bdx_url, tags, published_at, og_image_url, og_image_path, image_urls,
-                           image_paths, excerpt, html, category_name, source)
+                           image_paths, excerpt, html, source)
     except urllib.error.URLError as e:
         print(e)
         return
@@ -408,21 +426,49 @@ def get_url_list(category_page_soup):
                 # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
                 if not check_news(news_url, category_name):
                     url_list.append(news_url)
-        return url_list
+    elif source.name == 'bongdaplus.vn':
+        news_fst_tag = category_page_soup.find_element_by_css_selector('div.news.fst')
+        if news_fst_tag:
+            news_url = news_fst_tag.find_element_by_tag_name('a').get_attribute('href')
+            # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
+            if not check_news(news_url, category_name):
+                url_list.append(news_url)
+        newslst_tags = category_page_soup.find_elements_by_class_name('newslst')
+        if newslst_tags:
+            for newslst_tag in newslst_tags:
+                li_tags = newslst_tag.find_elements_by_class_name('news')
+                for li_tag in li_tags:
+                    news_url = li_tag.find_element_by_tag_name('a').get_attribute('href')
+                    # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
+                    if not check_news(news_url, category_name):
+                        url_list.append(news_url)
+        category_page_soup.close()
+    return url_list
 
 
 def get_category_page_soup():
-    page = 2
+    page = 1
     category_page_soup = None
     if source.name == 'bongda.com.vn':
-        for page in range(1, page):
+        for page in range(1, page + 1):
             category_page_url = get_category_page_url(slug_item, source, page)
             try:
                 category_page_soup = get_soup(category_page_url)
             except ConnectionError:
                 print('No response!')
                 continue
-    return category_page_soup
+        return category_page_soup
+    elif source.name == 'bongdaplus.vn':
+        driver = set_up()
+        category_page_url = get_category_page_url(slug_item, source, 0)
+        driver.get(category_page_url)
+        if page != 1:
+            for index in range(1, page):
+                more_button_tag = driver.find_element_by_class_name('addmore')
+                if more_button_tag:
+                    more_button_tag.click()
+                time.sleep(2)
+        return driver
 
 
 def crawl():
@@ -433,6 +479,7 @@ def crawl():
     if not url_list:
         return
     for url_item in url_list:
+        print(url_item)
         crawl_a_news(url_item)
 
 
@@ -451,37 +498,5 @@ if __name__ == '__main__':
             # 'bong-da-anh': 'Bóng Đá Anh'
             dicSlug = get_dict_slug(source)
             category_name = dicSlug[slug_item]
-            # create_category(category_name)
+            # Băt đầu handle
             crawl()
-
-            # # Trang của mục và số trang mà bạn muốn
-            # page = 2
-            # if source.name == 'bongda.com.vn':
-            #     for page in range(1, page):
-            #         category_page_url = get_category_page_url(slug_item, source, page)
-            #         try:
-            #             soup = get_soup(category_page_url)
-            #         except ConnectionError:
-            #             print('No response!')
-            #             continue
-            #         handle_a_web(source, soup)
-            # elif source.name == 'bongdaplus.vn':
-            #     category_page_url = get_category_page_url(slug_item, source, None)
-            #     driver = set_up()
-            #     driver.get(category_page_url)
-            #     for index in range(1, page):
-            #         more_button_tag = driver.find_element_by_class_name('addmore')
-            #         if more_button_tag:
-            #             more_button_tag.click()
-            #         time.sleep(2)
-            #
-            #     newslst_tags = driver.find_elements_by_class_name('newslst')
-            #     if newslst_tags:
-            #         for newslst_tag in newslst_tags:
-            #             li_tags = newslst_tag.find_elements_by_class_name('news')
-            #             for li_tag in li_tags:
-            #                 news_url = li_tag.find_element_by_tag_name('a').get_attribute('href')
-            #                 if not check_article(news_url):
-            #                     handle_an_article(news_url, category_name, source)
-            #     driver.close()
-

@@ -15,15 +15,6 @@ class Source(Base):
         return "<Source(name='{}')>".format(self.name)
 
 
-class Category(Base):
-    __tablename__ = 'categories'
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False, unique=True)
-
-    def __repr__(self):
-        return "<Category(name='{}')>".format(self.name)
-
-
 class Article(Base):
     __tablename__ = 'articles'
     id = Column(Integer, primary_key=True)
@@ -38,7 +29,6 @@ class Article(Base):
     image_paths = Column(ARRAY(String))
     excerpt = Column(String)
     html = Column(String)
-    category_id = Column(Integer, ForeignKey("categories.id", ondelete='SET NULL'))
     source_id = Column(Integer, ForeignKey("sources.id", ondelete='SET NULL'))
 
     def __repr__(self):
