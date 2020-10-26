@@ -1,3 +1,4 @@
+import http.client
 import time
 from datetime import datetime, tzinfo, timedelta
 import os
@@ -17,16 +18,24 @@ def get_slug_list(_source):
         return ['bong-da-anh', 'ngoai-hang-anh', 'cup-lien-doan-anh', 'cup-fa', 'tin-khac-anh', 'bong-da-tbn',
                 'la-liga', 'cup-nha-vua', 'bong-da-y', 'serie-a', 'cup-quoc-gia-y', 'tin-khac-italia', 'bong-da-duc',
                 'bundesliga', 'cup-quoc-gia-duc', 'tin-khac-duc', 'bong-da-phap', 'ligue-1', 'cup-lien-doan-phap',
-                'tin-khac-phap', 'champions-league', 'europa-league', 'tin-chuyen-nhuong', 'hau-truong-san-co']
+                'tin-khac-phap', 'champions-league', 'europa-league', 'tin-chuyen-nhuong', 'hau-truong-san-co',
+                'viet-nam', 'doi-tuyen-quoc-gia', 'cup-quoc-gia-vn', 'hang-nhat-vn', 'giai-tre-vn', 'bong-da-nu', 'vff',
+                'tin-khac-vn', 'bong-da-chau-a', 'sea-games', 'euro-2020', 'asian-cup', 'giao-huu', 'bong-da-chau-au',
+                'bong-da-chau-my', 'bong-da-chau-phi']
     elif _source.name == 'bongdaplus.vn':
         return ['ngoai-hang-anh', 'bong-da-tay-ban-nha', 'bong-da-y', 'bong-da-duc', 'bong-da-phap',
-                'champions-league-cup-c1', 'europa-league', 'chuyen-nhuong']
+                'champions-league-cup-c1', 'europa-league', 'chuyen-nhuong', 'bong-da-viet-nam']
 
 
-def get_dict_slug(_source):
-    _dicSlug = []
+def get_sub_slug_list():
+    return ['v-league', 'hang-nhat', 'cup-quoc-gia', 'dtqg', 'bong-da-nu', 'u17-quoc-gia', 'aff-suzuki-cup',
+            'afc-champions-league', 'afc-cup', 'cac-doi-tuyen-tre', 'futsal', 'tin-khac']
+
+
+def get_slug_dict(_source):
+    _slugDic = []
     if _source.name == 'bongda.com.vn':
-        _dicSlug = {
+        _slugDic = {
             'bong-da-anh': 'Bóng Đá Anh',
             'ngoai-hang-anh': 'Ngoại Hạng Anh',
             'cup-lien-doan-anh': 'Cúp Liên Đoàn Anh',
@@ -51,10 +60,27 @@ def get_dict_slug(_source):
             'hau-truong-san-co': 'Hậu Trường',
             'champions-league': 'Champions League',
             'europa-league': 'Europa League',
-            'tin-chuyen-nhuong': 'Tin Chuyển Nhượng'
+            'tin-chuyen-nhuong': 'Tin Chuyển Nhượng',
+            'viet-nam': 'Bóng Đá Việt Nam',
+            'doi-tuyen-quoc-gia': 'Các Đội Tuyển Quốc Gia Việt Nam',
+            'v-league': 'V-League',
+            'cup-quoc-gia-vn': 'Cúp Quốc Gia Việt Nam',
+            'hang-nhat-vn': 'Hạng Nhất Việt Nam',
+            'giai-tre-vn': 'Giải Trẻ Việt Nam',
+            'bong-da-nu': 'Bóng Đá Nữ Việt Nam',
+            'vff': 'VFF',
+            'tin-khac-vn': 'Tin Khác Bóng Đá Việt Nam',
+            'bong-da-chau-a': 'Bóng Đá Châu Á',
+            'sea-games': 'Sea Games',
+            'euro-2020': 'Euro 2020',
+            'asian-cup': 'Asian Cup',
+            'giao-huu': 'Giao Hữu',
+            'bong-da-chau-au': 'Bóng Đá Châu Âu',
+            'bong-da-chau-my': 'Bóng Đá Châu Mỹ',
+            'bong-da-chau-phi': 'Bóng Đá Châu Phi'
         }
     if _source.name == 'bongdaplus.vn':
-        _dicSlug = {
+        _slugDic = {
             'ngoai-hang-anh': 'Bóng Đá Anh',
             'bong-da-tay-ban-nha': 'Bóng Đá Tây Ban Nha',
             'bong-da-y': 'Bóng Đá Ý',
@@ -62,9 +88,28 @@ def get_dict_slug(_source):
             'bong-da-phap': 'Bóng Đá Pháp',
             'champions-league-cup-c1': 'Champions League',
             'europa-league': 'Europa League',
-            'chuyen-nhuong': 'Tin Chuyển Nhượng'
+            'chuyen-nhuong': 'Tin Chuyển Nhượng',
+            'bong-da-viet-nam': 'Bóng Đá Việt Nam'
         }
-    return _dicSlug
+    return _slugDic
+
+
+def get_sub_slug_dict():
+    _sub_dicSlug = {
+        'v-league': 'V-League',
+        'hang-nhat': 'Hạng Nhất Việt Nam',
+        'cup-quoc-gia': 'Cúp Quốc Gia Việt Nam',
+        'dtqg': 'Đội Tuyển Quốc Gia Việt Nam',
+        'bong-da-nu': 'Bóng Đá Nữ Việt Nam',
+        'u17-quoc-gia': 'U17 Quốc Gia Việt Nam',
+        'aff-suzuki-cup': 'AFF Suzuki Cup',
+        'afc-champions-league': 'AFC Champions League',
+        'afc-cup': 'AFC Cup',
+        'cac-doi-tuyen-tre': 'Các Đội Tuyển Trẻ Việt Nam',
+        'futsal': 'Bóng Đá Futsal Việt Nam',
+        'tin-khac': 'Tin Khác Bóng Đá Việt Nam'
+    }
+    return _sub_dicSlug
 
 
 def get_soup(_url):
@@ -110,6 +155,9 @@ def get_tags(news_soup):
         return tags
     for a_tag in a_tags:
         tags.append(a_tag.get_text(strip=True).title())
+    if source.name == 'bongdaplus.vn':
+        if slug_item == 'bong-da-viet-nam':
+            tags.append(extra_category_name)
     return tags
 
 
@@ -118,6 +166,8 @@ def get_category_page_url(_slug_item, _source, _page):
         # http://www.bongda.com.vn/bong-da-anh/p1
         return 'http://www.bongda.com.vn/%s/p%s' % (_slug_item, _page)
     elif _source.name == 'bongdaplus.vn':
+        if _slug_item == 'bong-da-viet-nam':
+            return 'https://bongdaplus.vn/%s/' % _slug_item
         return 'https://bongdaplus.vn/%s.html' % _slug_item
 
 
@@ -360,11 +410,8 @@ def get_published_at(news_soup):
 
 def crawl_a_news(url_item):
     try:
-        try:
-            news_soup = get_soup(url_item)
-        except ConnectionError:
-            print('No response!')
-            return
+        news_soup = get_soup(url_item)
+
         title = get_title(news_soup)
         if title:
             slug = get_slug(title)
@@ -402,6 +449,12 @@ def crawl_a_news(url_item):
         return
     except ConnectionError:
         print('No response')
+        return
+    except http.client.InvalidURL:
+        print('Url của hình không hợp lệ')
+        return
+    except AttributeError:
+        print("There is no such attribute")
         return
 
 
@@ -461,6 +514,9 @@ def get_category_page_soup():
     elif source.name == 'bongdaplus.vn':
         driver = set_up()
         category_page_url = get_category_page_url(slug_item, source, 0)
+        if slug_item == 'bong-da-viet-nam':
+            category_page_url = '%s%s.html' % (category_page_url, sub_slug)
+        print(category_page_url)
         driver.get(category_page_url)
         if page != 1:
             for index in range(1, page):
@@ -484,6 +540,7 @@ def crawl():
 
 
 if __name__ == '__main__':
+    sub_slug = None
     recreate_tables()
     print('Nhập tên nguồn muốn cào:')
     print('Ví dụ: bongda.com.vn, bongdaplus.vn')
@@ -496,7 +553,15 @@ if __name__ == '__main__':
         for slug_item in slug_list:
             # Đổi slug sang tên của mục đó
             # 'bong-da-anh': 'Bóng Đá Anh'
-            dicSlug = get_dict_slug(source)
-            category_name = dicSlug[slug_item]
-            # Băt đầu handle
-            crawl()
+            slugDic = get_slug_dict(source)
+            category_name = slugDic[slug_item]
+            if source.name == 'bongdaslug.vn' and slug_item == 'bong-da-viet-nam':
+                sub_slug_list = get_sub_slug_list()
+                for sub_slug in sub_slug_list:
+                    sub_slugDic = get_sub_slug_dict()
+                    extra_category_name = sub_slugDic[sub_slug]
+                    # Băt đầu handle
+                    crawl()
+            else:
+                # Băt đầu handle
+                crawl()
