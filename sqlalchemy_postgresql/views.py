@@ -1,14 +1,13 @@
 from datetime import tzinfo, timedelta
 
 import requests
+from slugify import slugify
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-from token_genertion.cdn_token_genertion import cdn_token
 from sqlalchemy_postgresql.config import DATABASE_URI
 from sqlalchemy_postgresql.model import Base, Article, Source
+from token_genertion.cdn_token_genertion import cdn_token
 from token_genertion.ghost_token_genertion import create_token, key
-from slugify import slugify
 
 engine = create_engine(DATABASE_URI)
 
@@ -58,29 +57,47 @@ def get_slug(_title):
     return _slug
 
 
-def check_news(url, tag):
+def check_news(url, new_tag):
     news = session.query(Article).filter(Article.src_url == url).first()
     if news:
-        slug = get_slug(news.title)
-        is_published, news_id, updated_at, tags = get_post_by_slug(slug)
-        if tag not in news.tags:
-            news.tags = [*news.tags, tag]
+        print(url)
+        is_published, updated_at, tags = get_post_by_id(news.news_id)
+        if new_tag not in news.tags:
+            news.tags = [*news.tags, new_tag]
             session.add(news)
             session.commit()
             if is_published:
-                news.tags.append(tag)
-                updating_a_post(news_id, news.tags, updated_at)
-                print('Đã có trên Bongdaxanh.com!')
+                tags.append(new_tag)
+                updating_a_post(news.news_id, tags, updated_at)
+                print('Update tag trên Bongdaxanh.com!')
         print('Bài này có trong database!')
         return True
     else:
         return False
 
 
-def create_article(title, url, bdx_url, tags, published_at, og_image_url, og_image_path, image_urls, image_paths,
+def check_bdx_news(title, new_tag):
+    slug = get_slug(title)
+    is_published, news_id, updated_at, tags = get_post_by_slug(slug)
+    if news_id:
+        if new_tag not in tags:
+            if is_published:
+                tags.append(new_tag)
+                updating_a_post(news_id, tags, updated_at)
+                print('Update tag trên Bongdaxanh.com!')
+        print('Bài này có trên Bongdaxanh.com!')
+        return True
+    else:
+        return False
+
+
+def create_article(title, slug, news_id, url, bdx_url, tags, published_at, og_image_url, og_image_path, image_urls,
+                   image_paths,
                    excerpt, html, source):
     article = Article(
         title=title,
+        slug=slug,
+        news_id=news_id,
         src_url=url,
         bdx_url=bdx_url,
         tags=tags,
@@ -153,14 +170,15 @@ def verify_upload(verify_code):
         print('Verifying is not successful')
 
 
-def create_article_in_web(title, tags, published_at, og_image_url, excerpt, html):
+def create_article_in_web(title, slug, tags, published_at, og_image_url, excerpt, html):
     # Make an authenticated request to create a post
-    _id = None
+    news_id = None
     bdx_url = None
     ghost_token = create_token()
     headers = {'Authorization': 'Ghost {}'.format(ghost_token.decode())}
     url = 'https://www.bongdaxanh.com/ghost/api/v3/admin/posts/?source=html'
     body = {'posts': [{'title': title,
+                       'slug': slug,
                        'status': 'published',
                        'html': html,
                        'feature_image': og_image_url,
@@ -185,10 +203,25 @@ def create_article_in_web(title, tags, published_at, og_image_url, excerpt, html
     print(response.text)
     if response.ok:
         for ele in response.json()['posts']:
+            if ele['id']:
+                news_id = ele['id']
             if ele['url']:
                 bdx_url = ele['url']
                 break
-    return bdx_url
+    return bdx_url, news_id
+
+
+def get_post_by_id(news_id):
+    updated_at = None
+    tags = []
+    url = 'https://www.bongdaxanh.com/ghost/api/v3/content/posts/%s/?key=%s&include=tags' % (news_id, key)
+    response = requests.get(url)
+    if response.ok:
+        updated_at = response.json()['posts'][0]['updated_at']
+        json_tags = response.json()['posts'][0]['tags']
+        for json_tag in json_tags:
+            tags.append(json_tag['name'])
+    return response.ok, updated_at, tags
 
 
 def get_post_by_slug(slug):
@@ -216,4 +249,4 @@ def updating_a_post(news_id, tags, updated_at):
                    }]
     }
     response = requests.put(url, json=body, headers=headers)
-    print(response)
+    print(response.text)

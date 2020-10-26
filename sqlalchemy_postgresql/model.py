@@ -18,6 +18,8 @@ class Source(Base):
 class Article(Base):
     __tablename__ = 'articles'
     id = Column(Integer, primary_key=True)
+    slug = Column(String, unique=True)
+    news_id = Column(String, unique=True)
     title = Column(String, nullable=False)
     src_url = Column(String, unique=True)
     bdx_url = Column(String, unique=True)

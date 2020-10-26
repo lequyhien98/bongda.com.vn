@@ -8,7 +8,7 @@ import wget
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from sqlalchemy_postgresql.views import recreate_tables, create_article, create_article_in_web, uploading_image, \
-    create_tables, uploading_og_image, get_source, check_news, get_slug, get_post_by_slug, updating_a_post
+    create_tables, uploading_og_image, get_source, check_news, get_slug, get_post_by_id, updating_a_post, check_bdx_news
 from requests.exceptions import ConnectionError
 from utils.content_processor import clean_up_html
 
@@ -154,7 +154,8 @@ def get_tags(news_soup):
     if not a_tags:
         return tags
     for a_tag in a_tags:
-        tags.append(a_tag.get_text(strip=True).title())
+        if len(a_tag.get_text(strip=True)) > 0:
+            tags.append(a_tag.get_text(strip=True).title())
     if source.name == 'bongdaplus.vn':
         if slug_item == 'bong-da-viet-nam':
             tags.append(extra_category_name)
@@ -414,36 +415,30 @@ def crawl_a_news(url_item):
 
         title = get_title(news_soup)
         if title:
-            slug = get_slug(title)
-            is_published, news_id, updated_at, tags = get_post_by_slug(slug)
-            if is_published:
-                print('Đã có trên Bongdaxanh.com!')
-                if category_name not in tags:
-                    tags.append(category_name)
-                    updating_a_post(news_id, tags, updated_at)
-                return
+            if not check_bdx_news(title, category_name):
+                tags = get_tags(news_soup)
+                excerpt = get_excerpt(news_soup)
 
-            tags = get_tags(news_soup)
-            excerpt = get_excerpt(news_soup)
+                slug = get_slug(title)
 
-            # Lấy hình trong post lưu đường dẫn vào url
-            image_paths, image_urls = get_images(title, news_soup)
+                # Lấy hình trong post lưu đường dẫn vào url
+                image_paths, image_urls = get_images(title, news_soup)
 
-            # Lấy hình trong og_image trong post lưu đường dẫn vào url để SEO
-            og_image_path, og_image_url = get_og_image(title, news_soup)
+                # Lấy hình trong og_image trong post lưu đường dẫn vào url để SEO
+                og_image_path, og_image_url = get_og_image(title, news_soup)
 
-            # Lấy thời gian publish của bài post trên web
-            published_at = get_published_at(news_soup)
+                # Lấy thời gian publish của bài post trên web
+                published_at = get_published_at(news_soup)
 
-            # Lấy nội dung của bài post
-            html = get_desc(news_soup)
+                # Lấy nội dung của bài post
+                html = get_desc(news_soup)
 
-            #     # Đăng lên web
-            bdx_url = create_article_in_web(title, tags, published_at, og_image_url, excerpt, html)
+                #     # Đăng lên web
+                bdx_url, news_id = create_article_in_web(title, slug, tags, published_at, og_image_url, excerpt, html)
 
-            #     # Lưu bài vào database
-            create_article(title, url_item, bdx_url, tags, published_at, og_image_url, og_image_path, image_urls,
-                           image_paths, excerpt, html, source)
+                #     # Lưu bài vào database
+                create_article(title, slug, news_id, url_item, bdx_url, tags, published_at, og_image_url, og_image_path, image_urls,
+                               image_paths, excerpt, html, source)
     except urllib.error.URLError as e:
         print(e)
         return
