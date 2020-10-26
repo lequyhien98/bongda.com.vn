@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from token_genertion.cdn_token_genertion import cdn_token
 from sqlalchemy_postgresql.config import DATABASE_URI
 from sqlalchemy_postgresql.model import Base, Article, Source
-from token_genertion.ghost_token_genertion import create_token
+from token_genertion.ghost_token_genertion import create_token, key
 from slugify import slugify
 
 engine = create_engine(DATABASE_URI)
@@ -195,7 +195,7 @@ def get_post_by_slug(slug):
     news_id = None
     updated_at = None
     tags = []
-    url = 'https://www.bongdaxanh.com/ghost/api/v3/content/posts/slug/%s/?key=6639515e8b14a6b71a3e483479&include=tags' % slug
+    url = 'https://www.bongdaxanh.com/ghost/api/v3/content/posts/slug/%s/?key=%s&include=tags' % (slug, key)
     response = requests.get(url)
     if response.ok:
         news_id = response.json()['posts'][0]['id']
