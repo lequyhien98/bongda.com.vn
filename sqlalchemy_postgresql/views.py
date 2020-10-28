@@ -1,5 +1,4 @@
-from datetime import tzinfo, timedelta
-
+from datetime import tzinfo, timedelta, time
 import requests
 from slugify import slugify
 from sqlalchemy import create_engine
@@ -8,7 +7,7 @@ from sqlalchemy_postgresql.config import DATABASE_URI
 from sqlalchemy_postgresql.model import Base, Article, Source
 from token_genertion.cdn_token_genertion import cdn_token
 from token_genertion.ghost_token_genertion import create_token, key
-
+import time
 engine = create_engine(DATABASE_URI)
 
 # create a configured "Session" class
@@ -30,9 +29,10 @@ def recreate_tables():
 
 def create_source():
     session.add_all([
-        Source(name='bongda.com.vn', url='http://www.bongda.com.vn/'),
-        Source(name='bongdaplus.vn', url='https://bongdaplus.vn/')]
-    )
+        Source(name='bongda.com.vn', url='http://www.bongda.com.vn'),
+        Source(name='bongdaplus.vn', url='https://bongdaplus.vn'),
+        Source(name='24h.com.vn', url='https://www.24h.com.vn')
+    ])
     session.commit()
     session.close()
 
@@ -44,17 +44,17 @@ class VN(tzinfo):
         return timedelta(hours=7, minutes=00)
 
 
-def get_source(_source_name):
-    _source = session.query(Source).filter(Source.name == _source_name).first()
-    if not _source:
+def get_source(source_name):
+    source = session.query(Source).filter(Source.name == source_name).first()
+    if not source:
         print('Nguồn này không tồn tại!')
         return None
-    return _source
+    return source
 
 
-def get_slug(_title):
-    _slug = slugify(_title)
-    return _slug
+def get_slug(title):
+    slug = slugify(title)
+    return slug
 
 
 def check_news(url, new_tag):
@@ -76,7 +76,7 @@ def check_news(url, new_tag):
         return False
 
 
-def check_bdx_news(title, new_tag):
+def check_bdx_news(title, new_tag, is_out):
     slug = get_slug(title)
     is_published, news_id, updated_at, tags = get_post_by_slug(slug)
     if news_id:
@@ -85,10 +85,12 @@ def check_bdx_news(title, new_tag):
                 tags.append(new_tag)
                 updating_a_post(news_id, tags, updated_at)
                 print('Update tag trên Bongdaxanh.com!')
+        else:
+            is_out = True
         print('Bài này có trên Bongdaxanh.com!')
-        return True
+        return True, is_out
     else:
-        return False
+        return False, is_out
 
 
 def create_article(title, slug, news_id, url, bdx_url, tags, published_at, og_image_url, og_image_path, image_urls,
@@ -116,28 +118,28 @@ def create_article(title, slug, news_id, url, bdx_url, tags, published_at, og_im
     session.close()
 
 
-def uploading_og_image(_og_image_path):
-    _og_image_url = None
+def uploading_og_image(og_image_path):
+    og_image_url = None
     url = "https://cdn1.codeprime.net/api/upload/"
     payload = {
         'namespace': 'bdx',
         'keep_original_name': 'yes',
     }
     files = [
-        ('file', open(_og_image_path, 'rb'))
+        ('file', open(og_image_path, 'rb'))
     ]
     response = requests.request("POST", url, data=payload, files=files)
     if response.ok:
-        _og_image_url = response.json()['original']['url']
+        og_image_url = response.json()['original']['url']
         print('Uploading image is successful')
         verify_upload(response.json()['verifyCode'])
     else:
         print('Uploading image is not successful')
-    return _og_image_url
+    return og_image_url
 
 
-def uploading_image(image_path):
-    _image_url = None
+def uploading_image(image_path, width, height):
+    image_url = None
     url = "https://cdn1.codeprime.net/api/upload/"
     payload = {
         'namespace': 'bdx',
@@ -149,12 +151,15 @@ def uploading_image(image_path):
     ]
     response = requests.request("POST", url, data=payload, files=files)
     if response.ok:
-        _image_url = response.json()['resizeContain']['740x400']['url']
+        if width > 740 or height > 400:
+            image_url = response.json()['original']['url']
+        else:
+            image_url = response.json()['resizeContain']['740x400']['url']
         print('Uploading image is successful')
         verify_upload(response.json()['verifyCode'])
     else:
         print('Uploading image is not successful')
-    return _image_url
+    return image_url
 
 
 def verify_upload(verify_code):
@@ -230,17 +235,20 @@ def get_post_by_slug(slug):
     tags = []
     url = 'https://www.bongdaxanh.com/ghost/api/v3/content/posts/slug/%s/?key=%s&include=tags' % (slug, key)
     response = requests.get(url)
+    print(response)
     if response.ok:
         news_id = response.json()['posts'][0]['id']
         updated_at = response.json()['posts'][0]['updated_at']
         json_tags = response.json()['posts'][0]['tags']
         for json_tag in json_tags:
             tags.append(json_tag['name'])
+    elif response.status_code == 429:
+        time.sleep(int(response.headers["Retry-After"]))
     return response.ok, news_id, updated_at, tags
 
 
 def updating_a_post(news_id, tags, updated_at):
-    url = 'https://www.bongdaxanh.com/ghost/api/v3/admin/posts/%s/?key=6639515e8b14a6b71a3e483479' % news_id
+    url = 'https://www.bongdaxanh.com/ghost/api/v3/admin/posts/%s/?key=%s' % (news_id, key)
     ghost_token = create_token()
     headers = {'Authorization': 'Ghost {}'.format(ghost_token.decode())}
     body = {
