@@ -32,6 +32,13 @@ def get_slug_list():
         return ['bong-da-ngoai-hang-anh-c149', 'bong-da-duc-c152', 'bong-da-y-c150', 'bong-da-tay-ban-nha-c151',
                 'bong-da-phap-c344', 'bong-da-viet-nam-c182', 'cup-c1-champions-league-c153', 'tin-chuyen-nhuong-c53',
                 'europa-league-c48e4044']
+    elif source.name == 'thethao247.vn':
+        return ['bong-da-anh-c8', 'bong-da-tbn-c9', 'bong-da-y-c10', 'bong-da-duc-c11', 'bong-da-phap-c12',
+                'champions-league-c13', 'europa-league-c75', 'tin-chuyen-nhuong-c14', 'euro-2016-c135',
+                'world-cup-2014-c35', 'goc-nhin-c196',
+                'nhan-dinh-bong-da-c288', 'cac-giai-bong-da-quoc-te-khac-c34', 'bong-da-viet-nam-c1', 'v-league-c15',
+                'giai-hang-nhat-c16', 'tuyen-quoc-gia-vn-c19', 'bong-da-nu-viet-nam-c20', 'futsal-c184',
+                'afc-cup-champions-league-c226']
 
 
 def get_sub_slug_list():
@@ -52,7 +59,7 @@ def get_slug_dict():
             'tin-khac-tbn': 'Tin Khác Tây Ban Nha',
             'bong-da-tbn': 'Bóng Đá Tây Ban Nha',
             'bong-da-y': 'Bóng Đá Ý',
-            'serie-a': 'Seria',
+            'serie-a': 'Serie A',
             'cup-quoc-gia-y': 'Cúp Quốc Gia Ý',
             'tin-khac-italia': 'Tin Khác Ý',
             'bong-da-duc': 'Bóng Đá Đức',
@@ -68,7 +75,7 @@ def get_slug_dict():
             'europa-league': 'Europa League',
             'tin-chuyen-nhuong': 'Tin Chuyển Nhượng',
             'viet-nam': 'Bóng Đá Việt Nam',
-            'doi-tuyen-quoc-gia': 'Các Đội Tuyển Quốc Gia Việt Nam',
+            'doi-tuyen-quoc-gia': 'Đội Tuyển Quốc Gia Việt Nam',
             'v-league': 'V-League',
             'cup-quoc-gia-vn': 'Cúp Quốc Gia Việt Nam',
             'hang-nhat-vn': 'Hạng Nhất Việt Nam',
@@ -108,6 +115,30 @@ def get_slug_dict():
             'europa-league-c48e4044': 'Europa League',
             'tin-chuyen-nhuong-c53': 'Tin Chuyển Nhượng',
             'bong-da-viet-nam-c182': 'Bóng Đá Việt Nam'
+        }
+    elif source.name == 'thethao247.vn':
+        return {
+            'bong-da-anh-c8': 'Bóng Đá Anh',
+            'bong-da-tbn-c9': 'Bóng Đá Tây Ban Nha',
+            'bong-da-y-c10': 'Bóng Đá Ý',
+            'bong-da-duc-c11': 'Bóng Đá Đức',
+            'bong-da-phap-c12': 'Bóng Đá Pháp',
+            'euro-2016-c135': 'Euro 2020',
+            'world-cup-2014-c35': 'World Cup 2022',
+            'goc-nhin-c196': 'Góc nhìn',
+            'nhan-dinh-bong-da-c288': 'Nhận Định Bóng Đá',
+            'champions-league-c13': 'Champions League',
+            'europa-league-c75': 'Europa League',
+            'tin-chuyen-nhuong-c14': 'Tin Chuyển Nhượng',
+            'bong-da-viet-nam-c1': 'Bóng Đá Việt Nam',
+            'v-league-c15': 'V-League',
+            'giai-hang-nhat-c16': 'Hạng Nhất Việt Nam',
+            'tuyen-quoc-gia-vn-c19': 'Đội Tuyển Quốc Gia Việt Nam',
+            'bong-da-nu-viet-nam-c20': 'Bóng Đá Nữ Việt Nam',
+            'afc-cup-champions-league-c226': 'AFC Champions League',
+            'futsal': 'Bóng Đá Futsal Việt Nam',
+            'cac-giai-bong-da-quoc-te-khac-c34': 'Các Giải Đấu Quốc Tế Khác',
+            'futsal-c184': 'Futsal Việt Nam'
         }
 
 
@@ -172,6 +203,10 @@ def get_tags(news_soup):
         sbnws_tag = news_soup.find('div', {'class': 'sbNws'})
         if sbnws_tag:
             a_tags = sbnws_tag.findAll('a')
+    elif source.name == 'thethao247.vn':
+        tags_article_tag = news_soup.find('div', {'class': 'tags_article'})
+        if tags_article_tag:
+            a_tags = tags_article_tag.findAll('a')
     if not a_tags:
         return tags
     for a_tag in a_tags:
@@ -217,6 +252,8 @@ def get_category_page_url(page):
         return 'https://bongdaplus.vn/%s.html' % slug_item
     elif source.name == '24h.com.vn':
         return 'https://www.24h.com.vn/%s.html?vpage=%s' % (slug_item, page)
+    elif source.name == 'thethao247.vn':
+        return 'https://thethao247.vn/%s/' % slug_item
 
 
 def create_directory(title, is_thumbnail_image_path=False):
@@ -247,8 +284,14 @@ def get_title(news_soup):
         title_tag = news_soup.find('h1', {'class': 'artitle'})
     elif source.name == '24h.com.vn':
         title_tag = news_soup.find('h1', {'id': 'article_title'})
+    elif source.name == 'thethao247.vn':
+        title_tag = news_soup.find('h1', {'class': 'title_news_detail'})
     if title_tag:
         title = title_tag.get_text(strip=True)
+        if 'Trực tiếp' in title:
+            return None
+        elif 'Video highlight' in title:
+            return None
     print('Tên bài báo: %s' % title)
     return title
 
@@ -266,6 +309,8 @@ def get_excerpt(news_soup):
         excerpt_tag = news_soup.find('div', {'class': 'summary'})
     elif source.name == '24h.com.vn':
         excerpt_tag = news_soup.find('h2', {'id': 'article_sapo'})
+    elif source.name == 'thethao247.vn':
+        excerpt_tag = news_soup.find('p', {'class': 'typo_news_detail'})
     if excerpt_tag:
         excerpt = excerpt_tag.get_text(strip=True)
     if len(excerpt) > 300:
@@ -291,12 +336,18 @@ def get_images(title, news_soup):
     elif source.name == '24h.com.vn':
         desc_tag = news_soup.find('section', {'class': 'enter-24h-cate-article'})
         image_tags = desc_tag.find_all('img', {'class': 'news-image'})
+    elif source.name == 'thethao247.vn':
+        desc_tag = news_soup.find('div', {'id': 'main-detail'})
+        image_tags = desc_tag.find_all('img', {'class': 'img-responsive'})
     if image_tags:
         for index, image_tag in enumerate(image_tags, 1):
             # Lấy src của ảnh
             image_url = image_tag['src']
-            if 'https' not in image_url:
+            if 'http' not in image_url:
                 image_url = image_tag['data-original']
+            print(image_url)
+            if 'svg' in image_url:
+                continue
             # Tên path đặt ảnh mà bạn mong muốn
             new_path = final_directory + '/%s-%d.jpg' % (slug, index)
 
@@ -313,7 +364,6 @@ def get_images(title, news_soup):
                 width, height = img.size
             # Upload ảnh lên cdn với path mới
             image_tag['src'] = uploading_image(new_path, width, height)
-
             # Lưu lại để bỏ vào batabase
             image_paths.append(new_path)
             image_urls.append(image_tag['src'])
@@ -331,12 +381,7 @@ def get_og_image(title, news_soup):
 
     # Tạo slug đặt tên cho img
     slug = '/{}'.format('bong-da-xanh')
-    if source.name == 'bongda.com.vn':
-        og_image_tag = news_soup.find('meta', {'property': 'og:image'})
-    elif source.name == 'bongdaplus.vn':
-        og_image_tag = news_soup.find('meta', {'property': 'og:image'})
-    elif source.name == '24h.com.vn':
-        og_image_tag = news_soup.find('meta', {'property': 'og:image'})
+    og_image_tag = news_soup.find('meta', {'property': 'og:image'})
     if og_image_tag:
         # Lấy src của ảnh
         og_image_url = og_image_tag['content']
@@ -441,28 +486,54 @@ def get_desc(news_soup):
                 final_desc += table_tag
     elif source.name == '24h.com.vn':
         article_tag = news_soup.find('article', {'id': 'article_body'})
+        if news_soup.find('header', {'class': 'atclTit atclTitD mrT10'}):
+            news_soup.find('header', {'class': 'atclTit atclTitD mrT10'}).decompose()
+        if news_soup.find('div', {'class': 'updTm updTmD mrT5'}):
+            news_soup.find('div', {'class': 'updTm updTmD mrT5'}).decompose()
+        if news_soup.find('div', {'class': 'viewVideoPlay'}):
+            news_soup.find('div', {'class': 'viewVideoPlay'}).decompose()
+        if news_soup.find('h2', {'id': 'article_sapo'}):
+            news_soup.find('h2', {'id': 'article_sapo'}).decompose()
+        if news_soup.find('div', {'class': 'sbNws'}):
+            news_soup.find('div', {'class': 'sbNws'}).decompose()
+        if news_soup.find('div', {'class': 'data-embed-code-poll'}):
+            news_soup.find('div', {'class': 'data-embed-code-poll'}).decompose()
+        if news_soup.find('div', {'style': 'margin: 0 auto;background-color:#FFFFFF;width:687px;'}):
+            news_soup.find('div', {'style': 'margin: 0 auto;background-color:#FFFFFF;width:687px;'}).decompose()
         is_crawl = True
         for tag in article_tag.findAll(True):
             if is_crawl:
-                if tag.name == 'p':
-                    if tag.em or tag.name == 'em':
-                        continue
-                    if tag.attrs.get('class') == ['linkOrigin']:
-                        is_crawl = False
-                        continue
-                    if tag.img:
-                        if tag.attrs.get('align'):
-                            tag.name = 'figure'
-                            new_figcaption_tag = news_soup.new_tag('figcaption')
-                            new_figcaption_tag.string = tag.next_sibling.next_sibling.get_text(strip=True)
-                            tag.append(new_figcaption_tag)
-                            final_desc += clean_up_html(str(tag))
-                            continue
-                        else:
-                            continue
-                    if tag.get_text(strip=True) in final_desc:
-                        continue
-                    final_desc += clean_up_html(str(tag))
+                if tag.em or tag.name == 'em':
+                    continue
+                if tag.attrs.get('class') == ['linkOrigin']:
+                    is_crawl = False
+                    continue
+                if tag.img:
+                    if tag.name == 'div':
+                        p_tag = tag.find_next('p')
+                        while p_tag.get_text(strip=True) == '':
+                            p_tag = p_tag.find_next('p')
+                        new_figcaption_tag = news_soup.new_tag('figcaption')
+                        new_figcaption_tag.string = p_tag.get_text(strip=True)
+                        img_tag = tag.img
+                        new_figure_tag = news_soup.new_tag('figure')
+                        new_figure_tag.append(img_tag)
+                        tag = new_figure_tag
+                        tag.append(new_figcaption_tag)
+                    else:
+                        tag.name = 'figure'
+                        new_figcaption_tag = news_soup.new_tag('figcaption')
+                        new_figcaption_tag.string = tag.next_sibling.next_sibling.get_text(strip=True)
+                        tag.append(new_figcaption_tag)
+                if tag.get_text(strip=True) in final_desc:
+                    continue
+                final_desc += clean_up_html(str(tag))
+    elif source.name == 'thethao247.vn':
+        article_tag = news_soup.find('div', {'id': 'main-detail'})
+        for tag in article_tag.findAll(True):
+            if tag.get_text(strip=True) in final_desc:
+                continue
+            final_desc += clean_up_html(str(tag))
     final_desc += '<p>Nguồn: %s</p>' % source.name
     return final_desc
 
@@ -508,6 +579,19 @@ def get_published_at(news_soup):
             time_text_split = time_text.split(':')
             hour = int(time_text_split[0])
             minute = int(time_text_split[1])
+    elif source.name == 'thethao247.vn':
+        published_at_tag = news_soup.find('p', {'class': 'ptimezone'})
+        if published_at_tag:
+            published_at_text = published_at_tag.get_text(strip=True)
+            date_text = published_at_text.split(' ')[0]
+            time_text = published_at_text.split(' ')[1]
+            date_text_split = date_text.split('/')
+            year = int(date_text_split[2])
+            month = int(date_text_split[1])
+            day = int(date_text_split[0])
+            time_text_split = time_text.split(':')
+            hour = int(time_text_split[0])
+            minute = int(time_text_split[1])
     published_at = datetime(year, month, day, hour, minute, tzinfo=VN()).isoformat()
     return published_at
 
@@ -545,10 +629,10 @@ def crawl_a_news(url_item):
                 # Lấy nội dung của bài post
                 html = get_desc(news_soup)
 
-                #     # Đăng lên web
+                # Đăng lên web
                 bdx_url, news_id = create_article_in_web(title, slug, tags, published_at, og_image_url, excerpt, html)
 
-                #     # Lưu bài vào database
+                # Lưu bài vào database
                 create_article(title, slug, news_id, url_item, bdx_url, tags, published_at, og_image_url, og_image_path,
                                image_urls, image_paths, excerpt, html, source)
     except urllib.error.URLError as e:
@@ -560,8 +644,8 @@ def crawl_a_news(url_item):
     except http.client.InvalidURL:
         print('Url của hình không hợp lệ')
         return
-    except AttributeError:
-        print("There is no such attribute")
+    except AttributeError as name:
+        print(name)
         return
     except KeyError as name:
         print(name)
@@ -600,15 +684,32 @@ def get_url_list(category_page_soup):
                 continue
             url_list.append(a_tag.get('href'))
             print(a_tag.get('href'))
+    elif source.name == 'thethao247.vn':
+        div_tag = category_page_soup.find('div', 'colcontent')
+        url_list = []
+        for a_tag in div_tag.findAll('a', href=re.compile('^https://thethao247.vn/')):
+            if a_tag.get('href') in url_list:
+                continue
+            url_list.append(a_tag.get('href'))
+            print(a_tag.get('href'))
+
+        div_tag = category_page_soup.find('div', 'boxvideo_page')
+        for a_tag in div_tag.findAll('a', href=re.compile('^https://thethao247.vn/')):
+            if a_tag.get('href') in url_list:
+                continue
+            url_list.append(a_tag.get('href'))
+            print(a_tag.get('href'))
+
     return url_list
 
 
 def get_category_page_soup():
     page = 1
     category_page_soup = None
-    if source.name in ['bongda.com.vn', '24h.com.vn']:
+    if source.name in ['bongda.com.vn', '24h.com.vn', 'thethao247.vn']:
         for page in range(1, page + 1):
             category_page_url = get_category_page_url(page)
+            print(category_page_url)
             try:
                 category_page_soup = get_soup(category_page_url)
             except ConnectionError:
@@ -645,7 +746,6 @@ def crawl():
         if crawl_a_news(url_item):
             return True
         time.sleep(1)
-    exit()
     return False
 
 
@@ -654,8 +754,8 @@ if __name__ == '__main__':
     is_out = False
     recreate_tables()
     print('Nhập tên nguồn muốn cào:')
-    print('Ví dụ: bongda.com.vn, bongdaplus.vn, 24h.com.vn')
-    source_name = '24h.com.vn'
+    print('Ví dụ: bongda.com.vn, bongdaplus.vn, 24h.com.vn, thethao247.vn')
+    source_name = 'thethao247.vn'
     source = get_source(source_name)
     if source:
         # Lấy các mục có trong trang (slug)
