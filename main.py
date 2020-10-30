@@ -1,10 +1,12 @@
 import http.client
 import re
+import shutil
 import time
 from datetime import datetime, tzinfo, timedelta, timezone
 import os
 import urllib.error
 import cloudscraper
+import requests
 import wget
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
@@ -318,7 +320,7 @@ def get_excerpt(news_soup):
     return excerpt
 
 
-def get_images(title, news_soup):
+def get_images(title, news_soup, url_item):
     image_paths = []
     image_urls = []
     image_tags = None
@@ -350,12 +352,22 @@ def get_images(title, news_soup):
                 continue
             # Tên path đặt ảnh mà bạn mong muốn
             new_path = final_directory + '/%s-%d.jpg' % (slug, index)
-
-            # Tải ảnh về
-            file_name = wget.download(image_url, out=final_directory)
-
-            # Đổi tên lại theo path mà bạn đã đặt
-            os.rename(file_name, new_path)
+            if source.name == 'thethao247.vn':
+                headers = {
+                    'User-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                                  'Chrome/86.0.4240.111 Safari/537.36',
+                    'Referer': url_item,
+                    'DNT': '1',
+                }
+                r = requests.get(image_url, headers=headers)
+                if r.status_code == 200:
+                    with open(new_path, 'wb') as f:
+                        f.write(r.content)
+            else:
+                # Tải ảnh về
+                file_name = wget.download(image_url, out=final_directory)
+                # Đổi tên lại theo path mà bạn đã đặt
+                os.rename(file_name, new_path)
 
             if os.stat(new_path).st_size < 1000:
                 continue
@@ -371,7 +383,7 @@ def get_images(title, news_soup):
     return image_paths, image_urls
 
 
-def get_og_image(title, news_soup):
+def get_og_image(title, news_soup, url_item):
     og_image_path = None
     new_og_image_url = None
     og_image_tag = None
@@ -389,11 +401,23 @@ def get_og_image(title, news_soup):
         # Tên path đặt ảnh mà bạn mong muốn
         new_og_image_path = final_directory + '{}.jpg'.format(slug)
 
-        # Tải ảnh về
-        file_name = wget.download(og_image_url, out=final_directory)
+        if source.name == 'thethao247.vn':
+            headers = {
+                'User-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                              'Chrome/86.0.4240.111 Safari/537.36',
+                'Referer': url_item,
+                'DNT': '1',
+            }
+            r = requests.get(og_image_url, headers=headers)
+            if r.status_code == 200:
+                with open(new_og_image_path, 'wb') as f:
+                    f.write(r.content)
+        else:
+            # Tải ảnh về
+            file_name = wget.download(og_image_url, out=final_directory)
 
-        # Đổi tên lại theo path mà bạn đã đặt
-        os.rename(file_name, new_og_image_path)
+            # Đổi tên lại theo path mà bạn đã đặt
+            os.rename(file_name, new_og_image_path)
 
         # Upload ảnh lên cdn với path mới
         new_og_image_url = uploading_og_image(new_og_image_path)
@@ -408,7 +432,6 @@ def get_desc(news_soup):
     final_desc = ""
     if source.name == 'bongda.com.vn':
         desc_tag = news_soup.find('div', {'class': 'exp_content news_details'})
-
         # Xóa 'Tiểu Lam | 22:21 06/10/2020' ở cuối trang
         date_tag = desc_tag.find('div', {'class': 'text-right f13'})
         if date_tag:
@@ -530,6 +553,19 @@ def get_desc(news_soup):
                 final_desc += clean_up_html(str(tag))
     elif source.name == 'thethao247.vn':
         article_tag = news_soup.find('div', {'id': 'main-detail'})
+        rate_link_tags = article_tag.find_all('a', {'class': 'rate-link'})
+        if rate_link_tags:
+            for rate_link_tag in rate_link_tags:
+                rate_link_tag.decompose()
+        video_tag = article_tag.find('div', {'class': 'videomclWrapper'})
+        if video_tag:
+            if video_tag.find_next('p'):
+                video_tag.find_next('p').decompose()
+            elif video_tag.find_next('div'):
+                video_tag.find_next('div').decompose()
+        video_tag_1 = article_tag.find('div', {'class': 'dugout-video'})
+        if video_tag_1:
+            video_tag_1.find_next('p').decompose()
         for tag in article_tag.findAll(True):
             if tag.get_text(strip=True) in final_desc:
                 continue
@@ -606,6 +642,9 @@ def crawl_a_news(url_item):
             if _is_out:
                 return True
             if not is_published:
+                if news_soup.table:
+                    print('Có table!')
+                    return False
                 # Lấy thời gian publish của bài post trên web
                 published_at = get_published_at(news_soup)
                 utc_dt = datetime.now(timezone.utc)  # UTC time
@@ -621,10 +660,10 @@ def crawl_a_news(url_item):
                 slug = get_slug(title)
 
                 # Lấy hình trong post lưu đường dẫn vào url
-                image_paths, image_urls = get_images(title, news_soup)
+                image_paths, image_urls = get_images(title, news_soup, url_item)
 
                 # Lấy hình trong og_image trong post lưu đường dẫn vào url để SEO
-                og_image_path, og_image_url = get_og_image(title, news_soup)
+                og_image_path, og_image_url = get_og_image(title, news_soup, url_item)
 
                 # Lấy nội dung của bài post
                 html = get_desc(news_soup)
@@ -755,7 +794,7 @@ if __name__ == '__main__':
     recreate_tables()
     print('Nhập tên nguồn muốn cào:')
     print('Ví dụ: bongda.com.vn, bongdaplus.vn, 24h.com.vn, thethao247.vn')
-    source_name = 'thethao247.vn'
+    source_name = 'bongdaplus.vn'
     source = get_source(source_name)
     if source:
         # Lấy các mục có trong trang (slug)
