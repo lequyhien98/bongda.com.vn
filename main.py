@@ -846,8 +846,6 @@ def crawl():
 if __name__ == '__main__':
     sub_slug = None
     is_out = False
-    recreate_tables()
-    exit()
     print('Nhập tên nguồn muốn cào:')
     print('Ví dụ: bongda.com.vn, bongdaplus.vn, 24h.com.vn, thethao247.vn, vnexpress.net')
     source_name = input()
