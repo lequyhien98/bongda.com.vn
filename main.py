@@ -41,6 +41,8 @@ def get_slug_list():
                 'nhan-dinh-bong-da-c288', 'cac-giai-bong-da-quoc-te-khac-c34', 'bong-da-viet-nam-c1', 'v-league-c15',
                 'giai-hang-nhat-c16', 'tuyen-quoc-gia-vn-c19', 'bong-da-nu-viet-nam-c20', 'futsal-c184',
                 'afc-cup-champions-league-c226']
+    elif source.name == 'vnexpress.net':
+        return ['giai-ngoai-hang-anh', 'serie-a', 'la-liga', 'champions-league', 'bong-da-trong-nuoc', 'cac-giai-khac']
 
 
 def get_sub_slug_list():
@@ -142,6 +144,15 @@ def get_slug_dict():
             'cac-giai-bong-da-quoc-te-khac-c34': 'Các Giải Đấu Quốc Tế Khác',
             'futsal-c184': 'Futsal Việt Nam'
         }
+    elif source.name == 'vnexpress.net':
+        return {
+            'giai-ngoai-hang-anh': 'Bóng Đá Anh',
+            'la-liga': 'Bóng Đá Tây Ban Nha',
+            'serie-a': 'Bóng Đá Ý',
+            'champions-league': 'Champions League',
+            'bong-da-trong-nuoc': 'Bóng Đá Việt Nam',
+            'cac-giai-khac': 'Các Giải Khác'
+        }
 
 
 def get_sub_slug_dict():
@@ -209,6 +220,17 @@ def get_tags(news_soup):
         tags_article_tag = news_soup.find('div', {'class': 'tags_article'})
         if tags_article_tag:
             a_tags = tags_article_tag.findAll('a')
+    elif source.name == 'vnexpress.net':
+        if category_name == 'Bóng Đá Anh':
+            tags.append('Ngoại Hạng Anh')
+            tags.append('Premier League')
+        elif category_name == 'Bóng Đá Tây Ban Nha':
+            tags.append('La Liga')
+        elif category_name == 'Bóng Đá Ý':
+            tags.append('Serie A')
+        tags_article_tag = news_soup.find('div', {'class': 'tags'})
+        if tags_article_tag:
+            a_tags = tags_article_tag.findAll('a')
     if not a_tags:
         return tags
     for a_tag in a_tags:
@@ -256,6 +278,8 @@ def get_category_page_url(page):
         return 'https://www.24h.com.vn/%s.html?vpage=%s' % (slug_item, page)
     elif source.name == 'thethao247.vn':
         return 'https://thethao247.vn/%s/' % slug_item
+    elif source.name == 'vnexpress.net':
+        return 'https://vnexpress.net/bong-da/%s-p%s' % (slug_item, page)
 
 
 def create_directory(title, is_thumbnail_image_path=False):
@@ -288,6 +312,8 @@ def get_title(news_soup):
         title_tag = news_soup.find('h1', {'id': 'article_title'})
     elif source.name == 'thethao247.vn':
         title_tag = news_soup.find('h1', {'class': 'title_news_detail'})
+    elif source.name == 'vnexpress.net':
+        title_tag = news_soup.find('h1', {'class': 'title-detail'})
     if title_tag:
         title = title_tag.get_text(strip=True)
         if 'Trực tiếp' in title:
@@ -313,6 +339,8 @@ def get_excerpt(news_soup):
         excerpt_tag = news_soup.find('h2', {'id': 'article_sapo'})
     elif source.name == 'thethao247.vn':
         excerpt_tag = news_soup.find('p', {'class': 'typo_news_detail'})
+    elif source.name == 'vnexpress.net':
+        excerpt_tag = news_soup.find('p', {'class': 'description'})
     if excerpt_tag:
         excerpt = excerpt_tag.get_text(strip=True)
     if len(excerpt) > 300:
@@ -341,6 +369,9 @@ def get_images(title, news_soup, url_item):
     elif source.name == 'thethao247.vn':
         desc_tag = news_soup.find('div', {'id': 'main-detail'})
         image_tags = desc_tag.find_all('img', {'class': 'img-responsive'})
+    elif source.name == 'vnexpress.net':
+        desc_tag = news_soup.find('article', {'class': 'fck_detail'})
+        image_tags = desc_tag.find_all('img', {'itemprop': 'contentUrl'})
     if image_tags:
         for index, image_tag in enumerate(image_tags, 1):
             # Lấy src của ảnh
@@ -379,14 +410,13 @@ def get_images(title, news_soup, url_item):
             # Lưu lại để bỏ vào batabase
             image_paths.append(new_path)
             image_urls.append(image_tag['src'])
-
+            print(image_tag['src'])
     return image_paths, image_urls
 
 
 def get_og_image(title, news_soup, url_item):
     og_image_path = None
     new_og_image_url = None
-    og_image_tag = None
 
     # Tạo thư mục lưu ảnh
     final_directory = create_directory(title, True)
@@ -566,11 +596,17 @@ def get_desc(news_soup):
         video_tag_1 = article_tag.find('div', {'class': 'dugout-video'})
         if video_tag_1:
             video_tag_1.find_next('p').decompose()
-        for tag in article_tag.findAll(True):
-            if tag.get_text(strip=True) in final_desc:
-                continue
-            final_desc += clean_up_html(str(tag))
+        final_desc += clean_up_html(article_tag.prettify())
+    elif source.name == 'vnexpress.net':
+        article_tag = news_soup.find('article', {'class': 'fck_detail'})
+        list_news_tag = article_tag.find('ul', {'class': 'list-news gaBoxLinkDisplay'})
+        if list_news_tag:
+            list_news_tag.decompose()
+        article_tag.findAll('p')[-1].decompose()
+        final_desc += clean_up_html(article_tag.prettify())
     final_desc += '<p>Nguồn: %s</p>' % source.name
+    print(final_desc)
+    exit()
     return final_desc
 
 
@@ -628,13 +664,32 @@ def get_published_at(news_soup):
             time_text_split = time_text.split(':')
             hour = int(time_text_split[0])
             minute = int(time_text_split[1])
+    elif source.name == 'vnexpress.net':
+        published_at_tag = news_soup.find('span', {'class': 'date'})
+        if published_at_tag:
+            published_at_text = published_at_tag.get_text(strip=True)
+            date_text = published_at_text.split(' ')[-3].replace(',', '')
+            time_text = published_at_text.split(' ')[-2]
+            date_text_split = date_text.split('/')
+            year = int(date_text_split[2])
+            month = int(date_text_split[1])
+            day = int(date_text_split[0])
+            time_text_split = time_text.split(':')
+            hour = int(time_text_split[0])
+            minute = int(time_text_split[1])
     published_at = datetime(year, month, day, hour, minute, tzinfo=VN()).isoformat()
     return published_at
 
 
 def crawl_a_news(url_item):
     try:
-        news_soup = get_soup(url_item)
+        if source.name == 'vnexpress.net':
+            driver = set_up()
+            driver.get(url_item)
+            html = driver.page_source
+            news_soup = BeautifulSoup(html, 'html5lib')
+        else:
+            news_soup = get_soup(url_item)
 
         title = get_title(news_soup)
         if title:
@@ -642,9 +697,6 @@ def crawl_a_news(url_item):
             if _is_out:
                 return True
             if not is_published:
-                if news_soup.table:
-                    print('Có table!')
-                    return False
                 # Lấy thời gian publish của bài post trên web
                 published_at = get_published_at(news_soup)
                 utc_dt = datetime.now(timezone.utc)  # UTC time
@@ -702,50 +754,61 @@ def get_url_list(category_page_soup):
         if news_url_tag:
             for a_tag in news_url_tag.findAll('a', href=re.compile('^http://www.bongda.com.vn/')):
                 if a_tag.img:
-                    news_url = a_tag.get('href')
+                    url_item = a_tag.get('href')
                     # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
-                    if not check_news(news_url, category_name):
-                        url_list.append(news_url)
+                    if not check_news(url_item, category_name) and url_item not in url_list:
+                        url_list.append(url_item)
+                        print(url_item)
     elif source.name == 'bongdaplus.vn':
         for tag in category_page_soup.findAll('a', href=re.compile('^/{}/'.format(slug_item))):
-            news_url = '%s%s' % (source.url, tag.get('href'))
-            if news_url in url_list:
-                continue
+            url_item = '%s%s' % (source.url, tag.get('href'))
             # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
-            if not check_news(news_url, category_name):
-                url_list.append(news_url)
+            if not check_news(url_item, category_name) and url_item not in url_list:
+                url_list.append(url_item)
+                print(url_item)
     elif source.name == '24h.com.vn':
         category_page_soup.find('div', {'class': 'hotnew'}).decompose()
         section_tag = category_page_soup.find('section', {'class': 'enter-24h-cate-page'})
         url_list = []
         for a_tag in section_tag.findAll('a', href=re.compile('^https://www.24h.com.vn/bong-da/')):
-            if a_tag.get('href') in url_list:
-                continue
-            url_list.append(a_tag.get('href'))
-            print(a_tag.get('href'))
+            url_item = a_tag.get('href')
+            # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
+            if not check_news(url_item, category_name) and url_item not in url_list:
+                url_list.append(url_item)
+                print(url_item)
     elif source.name == 'thethao247.vn':
         div_tag = category_page_soup.find('div', 'colcontent')
         url_list = []
         for a_tag in div_tag.findAll('a', href=re.compile('^https://thethao247.vn/')):
-            if a_tag.get('href') in url_list:
+            url_item = a_tag.get('href')
+            # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
+            if not check_news(url_item, category_name) and url_item not in url_list:
+                url_list.append(url_item)
+                print(url_item)
+        div_tag_1 = category_page_soup.find('div', 'boxvideo_page')
+        for a_tag in div_tag_1.findAll('a', href=re.compile('^https://thethao247.vn/')):
+            # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
+            url_item = a_tag.get('href')
+            if not check_news(url_item, category_name) and url_item not in url_list:
+                url_list.append(url_item)
+                print(url_item)
+    elif source.name == 'vnexpress.net':
+        desc_tag = category_page_soup.find('div', {'class': 'col-left col-left-subfolder'})
+        for a_tag in desc_tag.findAll('a', href=re.compile('^https://vnexpress.net/')):
+            url_item = a_tag.get('href')
+            if 'box_comment_vne' in url_item:
                 continue
-            url_list.append(a_tag.get('href'))
-            print(a_tag.get('href'))
-
-        div_tag = category_page_soup.find('div', 'boxvideo_page')
-        for a_tag in div_tag.findAll('a', href=re.compile('^https://thethao247.vn/')):
-            if a_tag.get('href') in url_list:
-                continue
-            url_list.append(a_tag.get('href'))
-            print(a_tag.get('href'))
-
+            # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
+            if not check_news(url_item, category_name) and url_item not in url_list:
+                url_list.append(url_item)
+                print(url_item)
     return url_list
 
 
 def get_category_page_soup():
     page = 1
     category_page_soup = None
-    if source.name in ['bongda.com.vn', '24h.com.vn', 'thethao247.vn']:
+    if source.name in ['bongda.com.vn', '24h.com.vn', 'thethao247.vn', 'vnexpress.net']:
         for page in range(1, page + 1):
             category_page_url = get_category_page_url(page)
             print(category_page_url)
@@ -793,8 +856,8 @@ if __name__ == '__main__':
     is_out = False
     recreate_tables()
     print('Nhập tên nguồn muốn cào:')
-    print('Ví dụ: bongda.com.vn, bongdaplus.vn, 24h.com.vn, thethao247.vn')
-    source_name = 'bongdaplus.vn'
+    print('Ví dụ: bongda.com.vn, bongdaplus.vn, 24h.com.vn, thethao247.vn, vnexpress.net')
+    source_name = 'thethao247.vn'
     source = get_source(source_name)
     if source:
         # Lấy các mục có trong trang (slug)

@@ -27,5 +27,6 @@ def clean_up_html(html):
     # Xóa class
     html = re.sub('class=".*?"', '', html)
     html = re.sub('align=".*?"', '', html)
+    html = re.sub('id=".*?"', '', html)
     final_text = cleaner.clean_html(html)
     return final_text

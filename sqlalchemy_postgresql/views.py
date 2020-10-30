@@ -32,7 +32,8 @@ def create_source():
         Source(name='bongda.com.vn', url='http://www.bongda.com.vn'),
         Source(name='bongdaplus.vn', url='https://bongdaplus.vn'),
         Source(name='24h.com.vn', url='https://www.24h.com.vn'),
-        Source(name='thethao247.vn', url='https://thethao247.vn')
+        Source(name='thethao247.vn', url='https://thethao247.vn'),
+        Source(name='vnexpress.net', url='https://vnexpress.net')
     ])
     session.commit()
     session.close()
