@@ -3,7 +3,7 @@ import requests
 from slugify import slugify
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy_postgresql.config_local import DATABASE_URI
+from sqlalchemy_postgresql.config import DATABASE_URI
 from sqlalchemy_postgresql.model import Base, Article, Source
 from token_genertion.cdn_token_genertion import cdn_token
 from token_genertion.ghost_token_genertion import create_token, key
