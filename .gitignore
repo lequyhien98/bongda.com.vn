@@ -1,5 +1,3 @@
 /Images/
-/sqlalchemy_postgresql/config.py
-/token_genertion/cdn_token_genertion.py
-/token_genertion/ghost_token_genertion.py
+/sqlalchemy_postgresql/config_local.py
 /venv/
