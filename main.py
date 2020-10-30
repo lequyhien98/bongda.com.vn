@@ -857,7 +857,7 @@ if __name__ == '__main__':
     recreate_tables()
     print('Nhập tên nguồn muốn cào:')
     print('Ví dụ: bongda.com.vn, bongdaplus.vn, 24h.com.vn, thethao247.vn, vnexpress.net')
-    source_name = 'thethao247.vn'
+    source_name = input()
     source = get_source(source_name)
     if source:
         # Lấy các mục có trong trang (slug)

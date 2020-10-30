@@ -1,6 +1,6 @@
 from datetime import tzinfo, timedelta, time
 import requests
-from slugify import slugify
+from django.utils.text import slugify
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_postgresql.config import DATABASE_URI
