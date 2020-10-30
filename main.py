@@ -846,26 +846,25 @@ def crawl():
 if __name__ == '__main__':
     sub_slug = None
     is_out = False
-    print('Nhập tên nguồn muốn cào:')
-    print('Ví dụ: bongda.com.vn, bongdaplus.vn, 24h.com.vn, thethao247.vn, vnexpress.net')
-    source_name = input()
-    source = get_source(source_name)
-    if source:
-        # Lấy các mục có trong trang (slug)
-        # Ví dụ: bong-da-anh, bong-da-tbn
-        slug_list = get_slug_list()
-        for slug_item in slug_list:
-            # Đổi slug sang tên của mục đó
-            # 'bong-da-anh': 'Bóng Đá Anh'
-            slugDic = get_slug_dict()
-            category_name = slugDic[slug_item]
-            if source.name == 'bongdaplus.vn' and slug_item == 'bong-da-viet-nam':
-                sub_slug_list = get_sub_slug_list()
-                for sub_slug in sub_slug_list:
-                    sub_slugDic = get_sub_slug_dict()
-                    extra_category_name = sub_slugDic[sub_slug]
+    source_list = ['bongda.com.vn', 'bongdaplus.vn', '24h.com.vn', 'thethao247.vn', 'vnexpress.net']
+    for source_name in source_list:
+        source = get_source(source_name)
+        if source:
+            # Lấy các mục có trong trang (slug)
+            # Ví dụ: bong-da-anh, bong-da-tbn
+            slug_list = get_slug_list()
+            for slug_item in slug_list:
+                # Đổi slug sang tên của mục đó
+                # 'bong-da-anh': 'Bóng Đá Anh'
+                slugDic = get_slug_dict()
+                category_name = slugDic[slug_item]
+                if source.name == 'bongdaplus.vn' and slug_item == 'bong-da-viet-nam':
+                    sub_slug_list = get_sub_slug_list()
+                    for sub_slug in sub_slug_list:
+                        sub_slugDic = get_sub_slug_dict()
+                        extra_category_name = sub_slugDic[sub_slug]
+                        if crawl():
+                            continue
+                else:
                     if crawl():
                         continue
-            else:
-                if crawl():
-                    continue
