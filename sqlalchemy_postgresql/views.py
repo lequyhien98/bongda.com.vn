@@ -62,7 +62,6 @@ def get_slug(title):
 def check_news(url, new_tag):
     news = session.query(Article).filter(Article.src_url == url).first()
     if news:
-        print(url)
         is_published, updated_at, tags = get_post_by_id(news.news_id)
         if new_tag not in news.tags:
             news.tags = [*news.tags, new_tag]
@@ -228,6 +227,8 @@ def get_post_by_id(news_id):
         json_tags = response.json()['posts'][0]['tags']
         for json_tag in json_tags:
             tags.append(json_tag['name'])
+    elif response.status_code == 429:
+        time.sleep(int(response.headers["Retry-After"]))
     return response.ok, updated_at, tags
 
 
