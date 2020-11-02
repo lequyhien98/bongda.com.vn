@@ -331,7 +331,12 @@ def get_title(news_soup):
         if source.name == 'thethao247.vn':
             invalid_list = ('BXH', 'Bảng xếp hạng', 'Lịch thi đấu')
             if title.startswith(invalid_list):
-                print('Những bài viết có table')
+                print('Những bài viết không hỗ trợ trong Ghost')
+                return None
+        elif source.name == '24h.com.vn':
+            invalid_list = ['Bảng xếp hạng', 'Lịch thi đấu', 'Trực tiếp']
+            if title.startswith(invalid_list):
+                print('Những bài viết không hỗ trợ trong Ghost')
                 return None
         if 'Trực tiếp' in title:
             return None
@@ -556,64 +561,71 @@ def get_desc(news_soup):
                 final_desc += table_tag
     elif source.name == '24h.com.vn':
         article_tag = news_soup.find('article', {'id': 'article_body'})
-        if news_soup.find('header', {'class': 'atclTit atclTitD mrT10'}):
-            news_soup.find('header', {'class': 'atclTit atclTitD mrT10'}).decompose()
-        if news_soup.find('div', {'class': 'updTm updTmD mrT5'}):
-            news_soup.find('div', {'class': 'updTm updTmD mrT5'}).decompose()
-        if news_soup.find('div', {'class': 'viewVideoPlay'}):
-            news_soup.find('div', {'class': 'viewVideoPlay'}).decompose()
-        if news_soup.find('h2', {'id': 'article_sapo'}):
-            news_soup.find('h2', {'id': 'article_sapo'}).decompose()
-        if news_soup.find('div', {'class': 'sbNws'}):
-            news_soup.find('div', {'class': 'sbNws'}).decompose()
-        if news_soup.find('div', {'class': 'data-embed-code-poll'}):
-            news_soup.find('div', {'class': 'data-embed-code-poll'}).decompose()
-        if news_soup.find('div', {'style': 'margin: 0 auto;background-color:#FFFFFF;width:687px;'}):
-            news_soup.find('div', {'style': 'margin: 0 auto;background-color:#FFFFFF;width:687px;'}).decompose()
-        is_crawl = True
-        for tag in article_tag.findAll(True):
-            if is_crawl:
-                if tag.em or tag.name == 'em':
-                    continue
-                if tag.attrs.get('class') == ['linkOrigin']:
-                    is_crawl = False
-                    continue
-                if tag.img:
-                    if tag.name == 'div':
-                        p_tag = tag.find_next('p')
-                        while p_tag.get_text(strip=True) == '':
-                            p_tag = p_tag.find_next('p')
-                        new_figcaption_tag = news_soup.new_tag('figcaption')
-                        new_figcaption_tag.string = p_tag.get_text(strip=True)
-                        img_tag = tag.img
-                        new_figure_tag = news_soup.new_tag('figure')
-                        new_figure_tag.append(img_tag)
-                        tag = new_figure_tag
-                        tag.append(new_figcaption_tag)
-                    else:
+        if not article_tag:
+            return final_desc
+        div_tag = article_tag.find('div', {'class': 'bv-lq'})
+        if div_tag:
+            div_tag.decompose()
+        live_cnt_tags = article_tag.find_all('div', {'class': 'liveCnt'})
+        if live_cnt_tags:
+            for live_cnt_tag in live_cnt_tags:
+                live_cnt_tag.decompose()
+        if article_tag:
+            for tag in article_tag.findAll(True):
+                if tag.name == 'p':
+                    if tag.get_text(strip=True).startswith('VIDEO'):
+                        continue
+                    if tag.attrs.get('style') == 'display:flex;':
+                        continue
+                    elif tag.img:
+                        if re.match('https://cdn.24h.com.vn/upload/', tag.img.attrs.get('src')):
+                            pass
+                        else:
+                            if tag.img.attrs.get('data-original') is None:
+                                continue
+                            if 'svg' in tag.img.attrs.get('data-original'):
+                                continue
+                            tag.img['src'] = tag.img.attrs.get('data-original')
                         tag.name = 'figure'
-                        new_figcaption_tag = news_soup.new_tag('figcaption')
-                        new_figcaption_tag.string = tag.next_sibling.next_sibling.get_text(strip=True)
-                        tag.append(new_figcaption_tag)
-                if tag.get_text(strip=True) in final_desc:
-                    continue
-                final_desc += clean_up_html(str(tag))
+                        if tag.findNext('p').attrs.get('class') == ['img_chu_thich_0407']:
+                            new_figcaption_tag = news_soup.new_tag('figcaption')
+                            new_figcaption_tag.string = tag.findNext('p').get_text(strip=True)
+                            tag.append(new_figcaption_tag)
+                    elif tag.attrs.get('style') or tag.attrs.get('class'):
+                        continue
+                    final_desc += clean_up_html(str(tag))
+                elif tag.name == 'img':
+                    if tag.parent.name == 'div':
+                        if re.match('https://cdn.24h.com.vn/upload/', tag.attrs.get('src')):
+                            continue
+                        else:
+                            if 'svg' in tag.attrs.get('data-original'):
+                                continue
+                            tag['src'] = tag.attrs.get('data-original')
+                        tag.parent.name = 'figure'
+                        figure_tag = tag.parent
+                        if figure_tag.find_next('p', {'class': 'img_chu_thich_0407'}):
+                            new_figcaption_tag = news_soup.new_tag('figcaption')
+                            new_figcaption_tag.string = figure_tag.find_next('p',
+                                                                             {'class': 'img_chu_thich_0407'}).get_text(
+                                strip=True)
+                            tag.parent.append(new_figcaption_tag)
+                        final_desc += clean_up_html(str(figure_tag))
     elif source.name == 'thethao247.vn':
-        article_tag = news_soup.find('div', {'id': 'main-detail'})
-        rate_link_tags = article_tag.find_all('a', {'class': 'rate-link'})
+        div_tag = news_soup.find('div', {'id': 'main-detail'})
+        if not div_tag:
+            return final_desc
+        rate_link_tags = div_tag.find_all('a', {'class': 'rate-link'})
         if rate_link_tags:
             for rate_link_tag in rate_link_tags:
-                rate_link_tag.decompose()
-        video_tag = article_tag.find('div', {'class': 'videomclWrapper'})
-        if video_tag:
-            if video_tag.find_next('p'):
-                video_tag.find_next('p').decompose()
-            elif video_tag.find_next('div'):
-                video_tag.find_next('div').decompose()
-        video_tag_1 = article_tag.find('div', {'class': 'dugout-video'})
-        if video_tag_1:
-            video_tag_1.find_next('p').decompose()
-        final_desc += clean_up_html(article_tag.prettify())
+                if rate_link_tag.parent.name == 'p':
+                    rate_link_tag.parent.decompose()
+        for tag in div_tag.findAll(True):
+            if tag.name == 'p':
+                if tag.attrs.get('style') != 'text-align: center;':
+                    final_desc += clean_up_html(str(tag))
+            elif tag.name == 'figure':
+                final_desc += clean_up_html(str(tag))
     elif source.name == 'vnexpress.net':
         article_tag = news_soup.find('article', {'class': 'fck_detail'})
         list_news_tag = article_tag.find('ul', {'class': 'list-news gaBoxLinkDisplay'})
@@ -711,6 +723,8 @@ def crawl_a_news(url_item):
 
                 # Lấy nội dung của bài post
                 html = get_desc(news_soup)
+                if len(html) < 20:
+                    return False
 
                 # Đăng lên web
                 bdx_url, news_id = create_article_in_web(title, slug, tags, published_at, og_image_url, excerpt, html)
@@ -833,7 +847,6 @@ def crawl():
 if __name__ == '__main__':
     sub_slug = None
     is_out = False
-    recreate_tables()
     source_list = ['bongda.com.vn', 'bongdaplus.vn', '24h.com.vn', 'thethao247.vn', 'vnexpress.net']
 
     for source_name in source_list:
