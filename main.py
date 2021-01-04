@@ -302,7 +302,8 @@ def create_directory(title, is_thumbnail_image_path=False):
     category_file = os.path.join(image_file, category_name)
     if not os.path.exists(category_file):
         os.makedirs(category_file)
-    final_directory = os.path.join(category_file, title)
+    slug_title = get_slug(title)
+    final_directory = os.path.join(category_file, slug_title)
     if not os.path.exists(final_directory):
         os.makedirs(final_directory)
     # Nếu là thumbnail thì tạo riêng 1 thư mục khác
@@ -334,7 +335,7 @@ def get_title(news_soup):
                 print('Những bài viết không hỗ trợ trong Ghost')
                 return None
         elif source.name == '24h.com.vn':
-            invalid_list = ['Bảng xếp hạng', 'Lịch thi đấu', 'Trực tiếp']
+            invalid_list = ('Bảng xếp hạng', 'Lịch thi đấu', 'Trực tiếp')
             if title.startswith(invalid_list):
                 print('Những bài viết không hỗ trợ trong Ghost')
                 return None
@@ -405,6 +406,10 @@ def get_images(title, news_soup, url_item):
                 continue
             # Tên path đặt ảnh mà bạn mong muốn
             new_path = final_directory + '/%s-%d.jpg' % (slug, index)
+            y = index
+            while os.path.exists(new_path):
+                y += 1
+                new_path = final_directory + '/%s-%d.jpg' % (slug, y)
             if source.name == 'thethao247.vn':
                 headers = {
                     'User-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -649,8 +654,8 @@ def get_published_at(news_soup):
         published_at_tag = news_soup.find('div', {'class': 'dtepub'})
         if published_at_tag:
             published_at_text = published_at_tag.get_text(strip=True)
-            date_text = published_at_text.split(' ')[3]
-            time_text = published_at_text.split(' ')[1]
+            date_text = published_at_text.split(' ')[2]
+            time_text = published_at_text.split(' ')[0]
     elif source.name == '24h.com.vn':
         published_at_tag = news_soup.find('div', {'class': 'updTm updTmD mrT5'})
         if published_at_tag:
@@ -684,6 +689,7 @@ def get_published_at(news_soup):
 
 
 def crawl_a_news(url_item):
+    print(url_item)
     try:
         if source.name == 'vnexpress.net':
             driver = set_up()
@@ -694,6 +700,7 @@ def crawl_a_news(url_item):
             news_soup = get_soup(url_item)
 
         title = get_title(news_soup)
+        print(title)
         if title:
             is_published, _is_out = check_bdx_news(title, category_name, False)
             if _is_out:
@@ -725,6 +732,7 @@ def crawl_a_news(url_item):
                 html = get_desc(news_soup)
                 if len(html) < 20:
                     return False
+
 
                 # Đăng lên web
                 bdx_url, news_id = create_article_in_web(title, slug, tags, published_at, og_image_url, excerpt, html)
@@ -760,7 +768,7 @@ def get_url_list(category_page_soup):
     if source.name == 'bongda.com.vn':
         news_list_tag = category_page_soup.find('div', {'class': 'col630 fr'})
         if news_list_tag:
-            a_tags = news_list_tag.findAll('a', href=re.compile('^http://www.bongda.com.vn/'))
+            a_tags = news_list_tag.findAll('a', href=re.compile('^https://www.bongda.com.vn/'))
             for a_tag in a_tags:
                 if a_tag.img:
                     news_url = a_tag.get('href')
@@ -768,7 +776,8 @@ def get_url_list(category_page_soup):
                     if not check_news(news_url, category_name) and news_url not in url_list:
                         url_list.append(news_url)
     elif source.name == 'bongdaplus.vn':
-        for tag in category_page_soup.findAll('a', href=re.compile('^/{}/'.format(slug_item))):
+        # for tag in category_page_soup.findAll('a', href=re.compile('^/{}/'.format(slug_item))):
+        for tag in category_page_soup.find_all('a', {'class': 'title'}):
             url_item = '%s%s' % (source.url, tag.get('href'))
             # Check xem bài post này đã có trong database chưa bằng việc xét url của nó
             if not check_news(url_item, category_name) and url_item not in url_list:
@@ -827,27 +836,24 @@ def get_category_page_soup():
 
 def crawl():
     url_list = []
-
     category_page_soup = get_category_page_soup()
     if category_page_soup:
         url_list = get_url_list(category_page_soup)
-
     if not url_list:
         return True
 
     for url_item in url_list:
-        print(url_item)
         if crawl_a_news(url_item):
             return True
         time.sleep(1)
-        break
-    return False
+    return True
 
 
 if __name__ == '__main__':
+    recreate_tables()
     sub_slug = None
     is_out = False
-    source_list = ['bongda.com.vn', 'bongdaplus.vn', '24h.com.vn', 'thethao247.vn', 'vnexpress.net']
+    source_list = ['bongda.com.vn', 'bongdaplus.vn', 'thethao247.vn', '24h.com.vn', 'vnexpress.net']
 
     for source_name in source_list:
         source = get_source(source_name)
@@ -856,20 +862,19 @@ if __name__ == '__main__':
             # Ví dụ: bong-da-anh, bong-da-tbn
             slug_list = get_slug_list()
             for slug_item in slug_list:
+                print(slug_item)
                 # Đổi slug sang tên của mục đó
                 # 'bong-da-anh': 'Bóng Đá Anh'
                 slugDic = get_slug_dict()
                 category_name = slugDic[slug_item]
 
-                if source.name == 'bongdaplus.vn' and slug_item == 'bong-da-viet-nam':
-                    sub_slug_list = get_sub_slug_list()
-                    for sub_slug in sub_slug_list:
-                        sub_slugDic = get_sub_slug_dict()
-                        extra_category_name = sub_slugDic[sub_slug]
-                        print(extra_category_name)
-                        if crawl():
-                            continue
-                else:
-                    print(category_name)
-                    if crawl():
-                        continue
+                # if source.name == 'bongdaplus.vn' and slug_item == 'bong-da-viet-nam':
+                #     sub_slug_list = get_sub_slug_list()
+                #     for sub_slug in sub_slug_list:
+                #         sub_slugDic = get_sub_slug_dict()
+                #         extra_category_name = sub_slugDic[sub_slug]
+                #         if crawl():
+                #             continue
+                # else:
+                if crawl():
+                    continue

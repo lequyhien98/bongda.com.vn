@@ -18,5 +18,12 @@
         </library>
       </libraries>
     </data-source>
+    <data-source source="LOCAL" name="bongdaxanh_db@localhost" uuid="d26a9480-3e1a-4dbe-8363-6125f264880c">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://localhost:5432/bongdaxanh_db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>
